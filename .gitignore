@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# 环境
+.venv/
+
+# IDE
+.idea/
+
+# 模型权重与数据（不进 git）
+*.pth
+*.safetensors
+checkpoints/*.bin
+
+# 系统
+.DS_Store
