@@ -1,7 +1,7 @@
 import torch
 
 # idx.shape (B, T)
-# 
+#
 def generate(model, idx, max_new_tokens, context_size, temperature, top_k = None, eos_id = None):
     # 最大可以生产的token，每次循环生成一个next
     for _ in range(max_new_tokens):

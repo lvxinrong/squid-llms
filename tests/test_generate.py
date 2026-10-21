@@ -1,6 +1,6 @@
 import torch
 
-from squid.generate.generate_text import generate
+from squid.generate.engine import generate
 from squid.model.gpt import GPTModel
 from squid.tokenizer import TiktokenTokenizer
 
