@@ -24,6 +24,8 @@ class LinearWithLoRA(nn.Module):
 
     def __init__(self, linear: nn.Linear, rank: int, alpha: float):
         super().__init__()
+        for p in linear.parameters():
+            p.requires_grad = False
         self.linear = linear
         self.lora = LoRALayer(linear.in_features, linear.out_features, rank, alpha)
 
