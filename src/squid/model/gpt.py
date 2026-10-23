@@ -1,9 +1,6 @@
 import torch
 from torch import nn
-
 from squid.model.layers import TransformerBlock, LayerNorm
-from squid.tokenizer import TiktokenTokenizer
-
 
 class GPTModel(nn.Module):
     def __init__(self, cfg):

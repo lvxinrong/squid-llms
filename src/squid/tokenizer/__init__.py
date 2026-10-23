@@ -1,1 +1,2 @@
 from .tiktoken_tokenizer import TiktokenTokenizer
+from .tiktoken_tokenizer import SquidTokenizer
