@@ -17,3 +17,7 @@ checkpoints/*.bin
 .DS_Store
 
 *.pdf
+
+# eval 产物
+instruction-data-with-response.json
+instruction-data-with-scores.json
