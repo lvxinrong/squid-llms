@@ -6,16 +6,25 @@ from tqdm import tqdm
 from openai import OpenAI
 
 from squid.data.instruct import format_input
+from squid.env import load_env
 
 _client = None
 
 
 def get_client():
-    # 懒加载：import 本模块不需要 key，真正调用才读环境变量
+    # 懒加载：import 本模块不需要 key，真正调用时才读 .env / 环境变量
     global _client
     if _client is None:
+        load_env()  # 项目根目录 .env 兜底；已存在的环境变量优先
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "缺少 DEEPSEEK_API_KEY：在项目根目录 .env 里加一行 "
+                "DEEPSEEK_API_KEY=sk-xxx（可参考 .env.example），"
+                "或在运行环境里配置同名环境变量。"
+            )
         _client = OpenAI(
-            api_key=os.environ["DEEPSEEK_API_KEY"],
+            api_key=api_key,
             base_url="https://api.deepseek.com",  # 不要带 /chat/completions
         )
     return _client

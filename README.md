@@ -10,6 +10,18 @@
 uv pip install -e .
 ```
 
+## 配置
+
+LLM 评委 `squid/eval/judge.py` 需要 DeepSeek API Key。项目根目录放一个 `.env`：
+
+```bash
+cp .env.example .env   # 然后把 DEEPSEEK_API_KEY 换成自己的
+```
+
+`.env` 已被 git 忽略。`judge.py` 首次调用时会自动加载它（路径按文件位置定位仓库根目录，不依赖
+Working directory，所以在 PyCharm 里直接 Run 也能读到）；如果系统里已经设置了同名环境变量，
+环境变量优先，`.env` 只做兜底。
+
 ## 结构
 
 ```

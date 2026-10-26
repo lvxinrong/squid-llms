@@ -1,9 +1,21 @@
+import pytest
 import torch
 
 from squid.eval.generate import generate_responses
 from squid.eval.judge import parse_score, summarize_scores
 from squid.model.gpt import GPTModel
 from squid.tokenizer import TiktokenTokenizer
+
+
+def test_missing_api_key_raises(monkeypatch):
+    from squid.eval import judge
+
+    monkeypatch.setattr(judge, "_client", None)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr(judge, "load_env", lambda *a, **k: False)  # 不读仓库 .env
+
+    with pytest.raises(RuntimeError, match="DEEPSEEK_API_KEY"):
+        judge.get_client()
 
 
 def test_parse_score():
