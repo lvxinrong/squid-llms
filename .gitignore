@@ -29,3 +29,6 @@ instruction-data-with-scores.json
 
 # 回归产物
 regression/
+
+# 训练语料与词表产物
+data/
