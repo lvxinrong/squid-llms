@@ -2,7 +2,8 @@ from squid.train.common import calc_loss_batch
 from squid.train.common import evaluate_model
 
 
-def pretrain_model(model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_iter):
+def pretrain_model(model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_iter,
+                   max_steps=None):
     train_losses, val_losses, track_tokens_seen = [], [], []
     global_step = -1
     # 记录训练过的token数量
@@ -11,6 +12,8 @@ def pretrain_model(model, train_loader, val_loader, optimizer, device, num_epoch
     for epoch in range(num_epochs):
         model.train()
         for input_batch, target_batch in train_loader:
+            if max_steps is not None and global_step >= max_steps:
+                break
             optimizer.zero_grad()
             loss = calc_loss_batch(input_batch, target_batch, model, device)
             loss.backward()
@@ -25,9 +28,9 @@ def pretrain_model(model, train_loader, val_loader, optimizer, device, num_epoch
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 track_tokens_seen.append(token_seen)
-                print(f"Ep {epoch + 1} (Step {global_step: 06d}): "
-                      f"Train loss {train_loss:.3f},"
-                      f"Val loss {val_loss:.3f}"
-                )
+                # print(f"Ep {epoch + 1} (Step {global_step: 06d}): "
+                #       f"Train loss {train_loss:.3f},"
+                #       f"Val loss {val_loss:.3f}"
+                # )
 
     return train_losses, val_losses, track_tokens_seen

@@ -1,0 +1,221 @@
+> 第七章把第六章那个会「分类」的 GPT-2 改造成一个能「听指令」的模型。数据管道抠出了两根针脚（+1 和 -100），训练时被 CPU 坑了一次，评估时亲手测出了「评委不同，分数不可比」。系列规则不变：写下来的必须是我自己搞懂的，答错的如实写。
+
+## 一、这一章在做什么：不换头、不冻结、只换数据
+
+第六章分类微调：换掉输出头（50257 → 2），冻结大部分参数，只训最后一块 + 新头。
+
+第七章指令微调：**不换头、不冻结、全参数训练**。模型结构和预训练时一模一样，输出还是 50257 维的 next-token 预测。改变的只有数据——从「连续文本」换成「指令 + 回答」的成对样本（1100 条，Alpaca 风格模板）。
+
+```
+Below is an instruction that describes a task. Write a response
+that appropriately completes the request.
+
+### Instruction:
+{指令}
+
+### Input:
+{输入（可空）}
+
+### Response:
+{回答}
+```
+
+套模板这个动作，我学前预测时答对了方向：**结构化本身就是模型要学习的内容**。模板让模型学会「哪里是指令、哪里是回答」，推理时必须用同一个模板，套错了模型就不认识。
+
+## 二、学前探针与验收约定
+
+这章开始和 Kimi 约定：学前探针只问主干（目标函数、数据流、结构差异），shape、API、参数细节放到学后验收。四个主干探针：
+
+- Q1（目标函数）：指令微调的 loss 和预训练只差一个动作——掩码。✅
+- Q2（数据量）：几千条样本为什么够？✅（见第四节）
+- Q3（模板与停止）：模板让模型学会在哪里结束。✅
+- Q4（评估）：没有标准答案怎么规模化评估？✅（见第五节）
+
+## 三、数据管道验收（7.1–7.4）
+
+### 验收 Q1：两种填充
+
+inputs 用 50256 pad 对齐 batch；targets 同样先补 50256，再把**除第一个之外**的所有 50256 替换成 -100（`cross_entropy` 的默认 `ignore_index`，传进去自动跳过）。
+
+保留第一个 50256 不掩盖，是为了让模型学会「说完就停」——把结束的权利交给模型自己。我第一遍把 50256 写成了 50257（词表大小），手误，但要警惕：词表 50257 个词，最后一个 id 是 50256。
+
+推论：inputs 里的 padding 虽然参与前向计算，但它们对应的 targets 位置已经是 -100，所以 padding 对 loss 的贡献是零。
+
+### 验收 Q2：错位一位与 +1
+
+`inputs = padded[:-1]`、`targets = padded[1:]`，错位一位是 next-token 监督，和预训练一致。
+
+`batch_max_length = max(len) + 1` 的 `+1` 不是防越界（我第一遍答错了），而是**给结束符留位置**：多塞的 50256 经过错位后恰好落在「回答最后一个 token」的下一格，保证每个样本都包含「回答说完 → 出 50256」这条监督信号。
+
++1 和「保留第一个 50256 不掩盖」是同一个设计的两半：一个留位置，一个放行信号。
+
+训练结束后这个设计在屏幕上跑了出来：
+
+```
+### Response: The meal is prepared every day by the chef.<|end-of-text|>
+```
+
+模型答完主动输出了 `<|end-of-text|>`——它学会了说「我说完了」。
+
+### 验收 Q3：指令部分盖不盖——答错了，记三笔账
+
+问题：targets 里要不要把指令部分的 token 也置成 -100，让 loss 只在回答上累加？
+
+我的结论（不盖）碰巧和书里默认一致，但论证错了两处：
+
+1. **BERT 类比是概念错位。** 我以为「盖住指令有点像 BERT 让模型猜结论」。错。这里的掩码只发生在 targets 的 loss 层，inputs 原封不动，模型完整读到指令。三种 mask 分管三层：BERT 的 `[MASK]` 是输入 token（模型看不见），GPT 的 causal mask 在注意力矩阵（挡未来位置），SFT 的 loss mask 只影响梯度（不影响可见性）。
+2. **指令微调是全部权重参与训练。** 我以为「不是更新全部权重」。错。第六章冻结了大部分参数，第七章不做任何冻结——全参数、同结构、换数据。
+
+盖住指令的真实理由是「监督信号的焦点」：要让模型学会的行为是写回答，不是写指令。小数据集上两者差别不大，但业界主流 SFT 默认 completion-only。nanochat 阶段会再遇到这个开关。
+
+## 四、为什么两轮就「够了」：表面对齐假说
+
+训练只跑了 2 个 epoch，train loss 2.74 → 0.30，val loss 2.72 → 0.62，曲线平滑无过拟合。为什么这么快？
+
+**因为指令微调不是学知识，是学姿势。**
+
+1. **知识早就在了。** GPT-2 medium 预训练时见过几十亿 token，语法、常识全会。这两轮没有教任何新知识，教的是：看到 `### Instruction:` 就进入听话模式，回答要干脆，说完要吐 `<|end-of-text|>`。这是行为格式的对齐，低维、好学。
+2. **数据集高度同构。** 1100 条、同一个模板、短平快回答，274 次梯度更新足够摸熟。
+3. **loss 要会读。** 交叉熵 0.657 ≈ 困惑度 1.93——但验证集和训练集同分布，窄分布上的低困惑度不等于通用能力。
+
+这个领域有个著名说法叫**表面对齐假说**（Superficial Alignment Hypothesis）：模型的能力几乎全部来自预训练，后训练只是调整它和人打交道的方式。我的 57 个 0 分（见下节）就是这个假说的实验证据。
+
+## 五、训练事故：CPU 和 MPS 的一百倍
+
+第一次训练，5 步跑了 3 分钟。原因：书里的代码是 `cuda if available else cpu`，Mac 没有 CUDA，直接落到 CPU。355M 全参数在 CPU 上，2 个 epoch 要 5 小时以上。
+
+越等越不敢杀——这是沉没成本在拽人。正确的判断是：杀不杀和已经等了多久无关，只和继续等值不值有关。杀掉，改 MPS，重跑：**完整训练 2 分 45 秒**。一百多倍的差距。
+
+这条纪律钉死：**训练前先确认 device，确认方式是看日志第一行打出来的 device，不是凭感觉。**
+
+device 改动是大肥鱼（另一个 AI）协助的，我做了口头验收：写死的 cpu 改成统一 device 变量，两处；权重加载走「先落 CPU 再 `.to(mps)`」的稳妥路径（`map_location="mps"` 历史上有兼容性问题）。Kimi 又纠了我两个工程观念：
+
+- 张量要**创建时就指定 device**（`torch.tensor(data, device=device)`），而不是创建后 `.to(device)` 搬运——一搬 vs 百搬
+- device 要**单一事实来源**：把 `device_mac_util.py` 升级成 `get_device()` 函数，所有脚本共用，换 CUDA 机器一行业务代码都不用改。（已记入学习回炉待办）
+
+## 六、评估：DeepSeek 当评委
+
+书里的评估方案是 LLM-as-judge：让另一个更强的模型给测试集的 110 条回答按 rubric 打分（0~100）。书里用 Ollama 本地跑 Llama 3 8B，我换成了 DeepSeek API——评委更强、不用本地下模型、一百多个请求成本可以忽略。
+
+工程纪律三条：评委 `temperature=0`；结果文件里记录评委型号和日期（`judge: deepseek-flash, 2026-10-19`）；请求加重试。
+
+### 结果：34.09 vs 50.32，分数不可比
+
+书里用 Llama 3 当评委拿到 50.32，我用 DeepSeek 拿到 34.09。**这两个分数不能直接比**——分数只在同一个评委内部有意义，它是（模型，评委）这对组合的属性，不是模型自己的属性。
+
+分布更有意思：
+
+```
+有效打分 110/110  |  mean=33.9  median=0  min=0  max=100
+  0 分:   57  ███████████████████████████████
+ 1-20:    7  ███
+21-40:    8  ████
+41-60:    7  ███
+61-80:    3  █
+81-100:  28  ███████████████
+```
+
+双峰：57 个 0 分，28 个 81+。我的第一嫌疑是打分解析器坏了（DeepSeek 返回格式和 Ollama 不同，解析失败兜底 0）。查原始数据后反转：评委每次只返回一个数字 token，解析完全正常——**这些 0 分大部分是罪有应得**：
+
+- 氯的化学符号 → 答 C（碳）
+- 疑问句类型 → 答 imperative（祈使句）
+- 1000 克换算 → 答 0.1 千克
+- 用 nostalgia 造句 → 造了一句不含 nostalgia 的
+
+Llama 3 的 50 分是宽宏大量，给「听起来像回事」的答案发参与奖；DeepSeek 是铁面判官，错就是 0。
+
+### 57 个 0 分画出的能力肖像
+
+把 0 分和高分按任务类型分开看，模型的真实画像出来了：
+
+- **格式转换类**（主动转被动、造比喻）→ 90+，指令微调**学会了**
+- **知识事实类**（化学符号、单位换算）→ 0，指令微调**救不了**
+
+这就是表面对齐假说的实验版：**微调教姿势，不教知识。** 355M 的底子就这么多知识，1100 条指令只能教会它「怎么答」，教不会它「答什么」。
+
+### 实测样本（节选）
+
+**高分区（81–100）**——答得干脆的常识题和格式题：
+
+> **指令**：What is the capital of Denmark?
+> 期望：The capital of Denmark is Copenhagen.
+> 模型：The capital of Denmark is Copenhagen.（100 分）
+
+> **指令**：Convert the sentence to passive voice. 输入：The gardener watered the plants.
+> 期望：The plants were watered by the gardener.
+> 模型：The plants were watered by the gardener.（100 分）
+
+> **指令**：Convert the sentence to use an indefinite pronoun. 输入：Someone left a note.
+> 期望：A note was left by someone.
+> 模型：A note was left by someone.（100 分）
+
+> **指令**：What is the chemical symbol for mercury?
+> 期望：Hg.
+> 模型：The chemical symbol for mercury is Hg.（100 分）
+
+**低分区（0 分）**——精确知识、小语种、换算，全是 355M 底子的边界：
+
+> **指令**：What is the periodic symbol for chlorine?
+> 期望：The periodic symbol for chlorine is Cl.
+> 模型：The periodic symbol for chlorine is C.（0 分，氯答成了碳）
+
+> **指令**：Create a sentence using the word 'nostalgia'.
+> 期望：Nostalgia washed over her as she looked through the old photos.
+> 模型：The past was a distant memory.（0 分，句子本身不差，但没用 nostalgia 这个词）
+
+> **指令**：Convert 1000 grams to kilograms.
+> 期望：1000 grams is equal to 1 kilogram.
+> 模型：1000 grams is 0.1 kilograms.（0 分）
+
+> **指令**：Convert 7 kilometers to meters.
+> 期望：7 kilometers is 7000 meters.
+> 模型：7 kilometers is 7.048 meters.（0 分，错得一本正经还精确到小数点）
+
+> **指令**：Translate 'library' into Spanish.
+> 期望：The Spanish word for 'library' is 'biblioteca'.
+> 模型：Están llegarme.（0 分， multilingual 直接崩了）
+
+> **指令**：What is the past tense of 'sing'?
+> 期望：The past tense of 'sing' is 'sang.'
+> 模型：The past tense of ‘sing’ is “to sing.”（0 分）
+
+高分区也不全是格式题——丹麦首都、汞的符号这种「大众常识」它答得上来；一碰到精确换算、小语种、罕见知识就露馅。所以更准确的分界线是：**预训练语料里高频出现的东西能保住，低频的保不住**。微调没有增加任何一边的库存。
+
+## 七、本章的新概念：KV cache
+
+学这章的晚上突然反应过来：KV cache 就是 trf 里 Q/K/V 的那个 K 和 V。谜底就在谜面上。
+
+因果注意力下，生成第 n+1 个 token 时只有它的 Q 是新的；之前 token 的 K、V 在生成那步已经算完且永不变，存下来复用即可。而我的 `generate()` 每生成一个 token 就把整段序列重新过一遍模型——KV cache 消掉的就是这个重复劳动。再看新闻里「KV Cache 压缩」，就知道它在省什么了。
+
+## 八、欠账（记入学习回炉待办）
+
+1. `device_mac_util.py` 升级成 `get_device()` 单一入口
+2. checkpoint 标准化：权重 + config + optimizer + val_loss 一起存，文件名带语义
+3. GGUF 化 + Ollama 部署：`.pth` → HF 格式 → GGUF → Modelfile，和自己微调的 355M 聊天（nanochat 部署链的预演）
+4. 双评委评估：DeepSeek + 本地模型交叉打分（2025 年「一个命题喂多个大模型」想法的第一个落地场景）
+
+## 九、一句话总结
+
+指令微调没有新算法，全是针脚：一个 +1、一个 -100、一个模板、一个评委。模型的「听话」不在模型里，在这些决定里。
+
+## 十、系列收官：第一份完整答卷
+
+到这一章，《从零构建大模型》的正文走完，这个系列的第一季收官。最后把这份答卷的分数原样贴上——不好看，但它是我自己的模型、自己的评委、自己的数据：
+
+```
+评委：DeepSeek (deepseek-flash)，2026-10-19，temperature=0
+对象：GPT-2 medium (355M)，1100 条指令数据微调 2 个 epoch
+测试集：110 条
+
+有效打分 110/110  |  mean=33.9  median=0  min=0  max=100
+  0 分:   57  ███████████████████████████████
+ 1-20:    7  ███
+21-40:    8  ████
+41-60:    7  ███
+61-80:    3  █
+81-100:  28  ███████████████
+```
+
+从笔记 00 的立项书到今天，手上多了这些东西：一个手敲的分词流程、一套从单头到多头的注意力、一个 124M 的 GPT、一次小规模预训练和它的过拟合曲线、一个垃圾短信分类器、一个会听指令会说「我说完了」的 355M、以及一套给它打分还被评委上了一课的评估流水线。
+
+分数不好，但证据链完整。接下来是第二遍回顾（欠的手写回炉在[学习回炉待办](/llm/backlog/)里），回顾和 nanochat 同步开始。

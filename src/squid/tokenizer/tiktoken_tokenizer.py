@@ -19,8 +19,3 @@ class TiktokenTokenizer(SquidTokenizer):
     @property
     def eos_id(self) -> int:
         return self._tok.eot_token
-
-
-if __name__ == '__main__':
-    tokenizer = TiktokenTokenizer("gpt2")
-    print(tokenizer.eos_id)

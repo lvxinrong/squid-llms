@@ -1,3 +1,4 @@
+from squid.tokenizer import SquidTokenizer
 
 def count_pairs(ids: list[int]) -> dict[tuple[int, int], int]:
     """统计相邻对频次。例：[1,2,3,1,2] → {(1,2):2, (2,3):1, (3,1):1}"""
@@ -52,5 +53,28 @@ def encode(text: str, merges) -> list[int]:
         ids = merge(ids, pair, new_id)
     return ids
 
+def save_bpe(vocab, merges, out_dir):
+    """把训练产物存成 JSON：vocab 为 id→hex(bytes)，merges 为有序 [left, right, new_id]。"""
+    import json
+    from pathlib import Path
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "vocab.json").write_text(
+        json.dumps({str(i): b.hex() for i, b in vocab.items()}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (out_dir / "merges.json").write_text(
+        json.dumps([[l, r, n] for (l, r), n in merges.items()], indent=2),
+        encoding="utf-8",
+    )
 
 
+def load_bpe(out_dir):
+    """读回 save_bpe 的产物，还原 vocab（id→bytes）和 merges（pair→new_id，保序）。"""
+    import json
+    from pathlib import Path
+    out_dir = Path(out_dir)
+    vocab = {int(i): bytes.fromhex(h) for i, h in
+             json.loads((out_dir / "vocab.json").read_text(encoding="utf-8")).items()}
+    merges = {(l, r): n for l, r, n in json.loads((out_dir / "merges.json").read_text())}
+    return vocab, merges
