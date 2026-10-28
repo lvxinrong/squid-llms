@@ -31,4 +31,4 @@ instruction-data-with-scores.json
 regression/
 
 # 训练语料与词表产物
-data/
+/data/

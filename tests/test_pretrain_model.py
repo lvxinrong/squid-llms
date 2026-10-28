@@ -55,7 +55,7 @@ def test_pretrain_model():
     num_epochs = 10
     train_losses, val_losses, tokens_seen = pretrain_model(
         model, train_loader, val_loader, optimizer, device, num_epochs=num_epochs,
-        eval_freq=5, eval_iter=5
+        eval_freq=5, eval_iter=5, accum_step=5
     )
     epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
     plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
