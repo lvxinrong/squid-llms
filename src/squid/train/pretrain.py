@@ -16,7 +16,7 @@ def pretrain_model(model, train_loader, val_loader, optimizer, device, num_epoch
 
     for epoch in range(num_epochs):
         model.train()
-        for i, (input_batch, target_batch) in enumerate(train_loader):
+        for input_batch, target_batch in train_loader:
             if max_steps is not None and global_step >= max_steps:
                 break
             global_step += 1  # 连续 micro-batch 计数（跨 epoch 不重置）
