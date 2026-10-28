@@ -45,7 +45,8 @@ def train_bpe(text: str, num_merges: int):
 
 
 def decode(ids: list[int], vocab) -> str:
-    return b"".join(vocab[i] for i in ids).decode("utf-8")
+    return b"".join(vocab[i] for i in ids).decode("utf-8", errors="replace")
+
 
 def encode(text: str, merges) -> list[int]:
     ids = list(text.encode("utf-8"))

@@ -51,11 +51,13 @@ def test_pretrain_model():
         shuffle=False,
     )
 
+    density = len(val_data.encode("utf-8")) / len(tokenizer.encode(val_data))
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.1)
     num_epochs = 10
     train_losses, val_losses, tokens_seen = pretrain_model(
         model, train_loader, val_loader, optimizer, device, num_epochs=num_epochs,
-        eval_freq=5, eval_iter=5, accum_step=5
+        eval_freq=5, eval_iter=5, accum_step=5, bpb_density=density
     )
     epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
     plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
