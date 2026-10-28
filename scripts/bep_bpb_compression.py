@@ -26,30 +26,31 @@ def train_model_with_nums_merge(num_merges: str):
     device = get_device()
     model = GPTModel(cfg)
     model.to(device)
+    print(sum(p.numel() for p in model.parameters()))
 
-    train_text = open(DATA / "train.txt", encoding="utf-8").read()
-    val_text = open(DATA / "heldout-手搓LLM笔记07-指令微调.txt", encoding="utf-8").read()
-    val_text = val_text + "\n" + open(DATA / "heldout-我想把家里的设备组成一个私人AI实验室.txt",
-                                      encoding="utf-8").read()
-
-    train_loader = create_pretrain_loader(train_text, tokenizer, 128, 128,
-                                          batch_size=8, shuffle=True)
-    val_loader = create_pretrain_loader(val_text, tokenizer, 128, 128,
-                                        batch_size=8, shuffle=False, drop_last=False)
-    optimizer = torch.optim.AdamW(model.parameters())
-    num_epochs = 100
-    train_losses, val_losses, tokens_seen = pretrain_model(
-        model=model, train_loader=train_loader, val_loader=val_loader,
-        optimizer=optimizer, device=device, num_epochs=num_epochs, max_steps=500, eval_freq=100, eval_iter=100
-    )
-    val_loss = calc_loss_loader(val_loader, model, device)
-    density = len(val_text.encode("utf-8")) / len(tokenizer.encode(val_text))
-    bpb = val_loss / math.log(2) / density
-    print(f"val_loss={val_loss:.3f}  bytes/token={density:.2f}  BPB={bpb:.3f}")
+    # train_text = open(DATA / "train.txt", encoding="utf-8").read()
+    # val_text = open(DATA / "heldout-手搓LLM笔记07-指令微调.txt", encoding="utf-8").read()
+    # val_text = val_text + "\n" + open(DATA / "heldout-我想把家里的设备组成一个私人AI实验室.txt",
+    #                                   encoding="utf-8").read()
+    #
+    # train_loader = create_pretrain_loader(train_text, tokenizer, 128, 128,
+    #                                       batch_size=8, shuffle=True)
+    # val_loader = create_pretrain_loader(val_text, tokenizer, 128, 128,
+    #                                     batch_size=8, shuffle=False, drop_last=False)
+    # optimizer = torch.optim.AdamW(model.parameters())
+    # num_epochs = 100
+    # train_losses, val_losses, tokens_seen = pretrain_model(
+    #     model=model, train_loader=train_loader, val_loader=val_loader,
+    #     optimizer=optimizer, device=device, num_epochs=num_epochs, max_steps=500, eval_freq=100, eval_iter=100
+    # )
+    # val_loss = calc_loss_loader(val_loader, model, device)
+    # density = len(val_text.encode("utf-8")) / len(tokenizer.encode(val_text))
+    # bpb = val_loss / math.log(2) / density
+    # print(f"val_loss={val_loss:.3f}  bytes/token={density:.2f}  BPB={bpb:.3f}")
 
 
 if __name__ == '__main__':
     train_model_with_nums_merge("m512")
-    train_model_with_nums_merge("m2000")
-    train_model_with_nums_merge("m4000")
-    train_model_with_nums_merge("m8000")
+    # train_model_with_nums_merge("m2000")
+    # train_model_with_nums_merge("m4000")
+    # train_model_with_nums_merge("m8000")

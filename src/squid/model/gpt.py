@@ -21,18 +21,20 @@ class GPTModel(nn.Module):
 
     # (B, T)  (batch, token)
     def forward(self, in_idx):
+        # (B, T) batch_size = B, seq_len = T
         batch_size, seq_len = in_idx.size()
         # (vocab_size, emb_dim)
         # nn.Embedding(x) 查表 查询每个token在tok_emb 中的词嵌入向量
         # 所以这里的tok_emb.shape(B, T, emb_dim) 相当于在原始词表中查询每个token_id 初始化后的token_embedding
         tok_embeds = self.tok_emb(in_idx)
-        # pos_embeds.shape(seq_len, emb_dim)
+        # pos_embeds.shape(T, emb_dim)
         # 给每个位置取一个位置向量，位置和token无关，pos是座位，token只是某个批次坐在这个位置上的人，批次更换，位置上的token也会变。所以
         # pos_emb的声明是 nn.Embedding(context_length, emb_dim)
         pos_embeds = self.pos_emb(
             torch.arange(seq_len, device=in_idx.device)
         )
         # 把位置信息编织进tok_embeds。x就同时拥有token和位置的信息
+        # (B, T, emb_dim)  + (T, emb_dim) 广播，最后一维相同
         x = tok_embeds + pos_embeds
         # 提前接触不完整数据，逼它学鲁棒的语义表示，而不是死记 token 的完整 embedding
         # x.shape (B, T, emb_dim)
