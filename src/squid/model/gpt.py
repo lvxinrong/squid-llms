@@ -20,7 +20,7 @@ class GPTModel(nn.Module):
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
 
     # (B, T)  (batch, token)
-    def forward(self, in_idx):
+    def forward(self, in_idx, past_kv=None, use_cache=False):
         # (B, T) batch_size = B, seq_len = T
         batch_size, seq_len = in_idx.size()
         # (vocab_size, emb_dim)
@@ -30,8 +30,11 @@ class GPTModel(nn.Module):
         # pos_embeds.shape(T, emb_dim)
         # 给每个位置取一个位置向量，位置和token无关，pos是座位，token只是某个批次坐在这个位置上的人，批次更换，位置上的token也会变。所以
         # pos_emb的声明是 nn.Embedding(context_length, emb_dim)
+        past_len = 0
+        if past_kv is not None:
+            past_len = past_kv[0][0].shape[2]
         pos_embeds = self.pos_emb(
-            torch.arange(seq_len, device=in_idx.device)
+            torch.arange(past_len, past_len + seq_len, device=in_idx.device)
         )
         # 把位置信息编织进tok_embeds。x就同时拥有token和位置的信息
         # (B, T, emb_dim)  + (T, emb_dim) 广播，最后一维相同
@@ -42,7 +45,12 @@ class GPTModel(nn.Module):
         # 经过多个trf block
         # x = x + att(norm1(x))    # 残差相加时，分支输出被 norm 过，但 x 本身没被 norm
         # x = x + ffn(norm2(x))
-        x = self.trf_block(x)
+        present = []
+        # x = self.trf_block(x)
+        for i, block in enumerate(self.trf_block):
+            past = past_kv[i] if past_kv is not None else None
+            x, present_kv = block(x, past)
+            present.append(present_kv)
         # 最终的结果归一化
         # 因为trf block里面 att ffn的norm都是针对shortcut 而不是主干x。这里是针对快捷连接的主干x进行最后一次归一化。
         # 残差主干 x 从头到尾没有被归一化过。它一路只做"原始值 + 分支增量"的叠加，层数一深，数值尺度会越滚越大（方差随深度线性增长）。
@@ -53,4 +61,6 @@ class GPTModel(nn.Module):
         # (B, T, emb_dim) @ (emb_dim, vocab_size) ->  (B, T, vocab_size)
         logits = self.out_head(x)
         # logits 记录的是每个T的next-token在整个vocab中的分数，假设vocab_size = 50257, 那最后一维就是记录的某个token的next-token 在词表中的分数分布，50257个词每个词有个分数，这里是分数，还没有到计算概率的时候
+        if use_cache:
+            return logits, present
         return logits

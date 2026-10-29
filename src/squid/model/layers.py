@@ -23,7 +23,7 @@ class MultiHeadAttention(nn.Module):
         )
 
     # x.shape (B, T, C)
-    def forward(self, x):
+    def forward(self, x, past_kv=None):
         # 获取x 在 q,k,v 上的投影
         b, num_tokens, d_in = x.shape
         queries = self.W_query(x)
@@ -40,6 +40,11 @@ class MultiHeadAttention(nn.Module):
         values = values.transpose(1, 2)
         queries = queries.transpose(1, 2)
 
+        if past_kv is not None:
+            past_k, past_v = past_kv
+            keys = torch.cat([past_k, keys], dim = 2)
+            values = torch.cat([past_v, values], dim = 2)
+        present_kv = (keys, values)
         # 计算 attn_score  q @ key, 计算每个头的点积
         # (b, num_heads, num_tokens, head_dim) @ (b, num_heads, head_dim, num_tokens)
         attn_scores = queries @ keys.transpose(2, 3)
@@ -48,9 +53,18 @@ class MultiHeadAttention(nn.Module):
 
 
         # 因果掩码，掩盖对角线右边的分数
-        mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
+        # 加入kv之后，因果掩码是需要区分首轮(无cache) 用原来的因果掩码。 增量步(q_len = 1) 就可以看到全部历史，不用掩码了
+        # mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
+        #
+        # attn_scores.masked_fill_(mask_bool, -torch.inf)
+        q_len = queries.shape[2]
+        if q_len == 1:
+            mask_bool = None
+        else:
+            mask_bool = self.mask.bool()[:q_len, :q_len]
 
-        attn_scores.masked_fill_(mask_bool, -torch.inf)
+        if mask_bool is not None:
+            attn_scores.masked_fill_(mask_bool, -torch.inf)
 
         # 计算 logits = softmax(q@key / sqrt(heads_dim))
         # 为什么要除以 dim ** 0.5 -> Q·K 的点积会让结果的标准差膨胀 √d 倍（随机相加只按根号速度增长），除以 √d 把标准差拉回 1，防止 softmax 因输入过大而饱和。one-shot
@@ -75,7 +89,7 @@ class MultiHeadAttention(nn.Module):
         # (b, num_tokens, d_out) @ (d_out, d_out) -> (b, num_tokens, d_out)
         context_vec = self.out_proj(context_vec)
 
-        return context_vec
+        return context_vec, present_kv
 
 # 前馈网络 FFN层  emb_dim -> 4 * emb_dim -> gelu -> emb_dim
 class FeedForward(nn.Module):
@@ -144,12 +158,13 @@ class TransformerBlock(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
     # x -> norm - > att - drop -> x + shortcut
     # x + shortcut -> norm -> ffn -> drop -> x + shortcut
-    def forward(self, x):
+    def forward(self, x, past_kv=None):
         # 保留x，残差链接是为了保证原始x可以一直传导到最后一层。shortcut 才是每层的计算结果。
         shortcut = x
         # Pre-Norm：先 norm 再进 attention
         x = self.norm1(x)
-        x = self.att(x)
+        #x = self.att(x)
+        x, present_kv = self.att(x, past_kv)
         # 随机清零x中的drop_rate% 个元素，然后剩下的元素 放大 1/(1−p) 倍
         x = self.drop_shortcut(x)
         x = x + shortcut
@@ -160,4 +175,4 @@ class TransformerBlock(nn.Module):
         x = self.drop_shortcut(x)
         x = x + shortcut
 
-        return x
+        return x, present_kv
