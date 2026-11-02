@@ -19,3 +19,7 @@ class TiktokenTokenizer(SquidTokenizer):
     @property
     def eos_id(self) -> int:
         return self._tok.eot_token
+
+    @property
+    def tok(self):
+        return self._tok
