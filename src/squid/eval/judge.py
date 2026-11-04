@@ -95,18 +95,71 @@ def parse_score(text):
     return max(0, min(100, int(match.group())))
 
 
-def summarize_scores(data):
+def build_score_summary(data):
     scores = sorted(e["score"] for e in data if isinstance(e.get("score"), int))
+    distribution = {
+        "0": 0,
+        "1-20": 0,
+        "21-40": 0,
+        "41-60": 0,
+        "61-80": 0,
+        "81-100": 0,
+    }
+
+    for score in scores:
+        for lo, hi in [(0, 0), (1, 20), (21, 40), (41, 60), (61, 80), (81, 100)]:
+            if lo <= score <= hi:
+                distribution[f"{lo}" if lo == hi else f"{lo}-{hi}"] += 1
+                break
+
+    summary = {
+        "total": len(data),
+        "valid_scores": len(scores),
+        "mean": None,
+        "median": None,
+        "min": None,
+        "max": None,
+        "p10": None,
+        "p90": None,
+        "distribution": distribution,
+    }
     if not scores:
+        return summary
+
+    ordered = sorted(scores)
+    summary.update({
+        "mean": sum(scores) / len(scores),
+        "median": ordered[len(ordered) // 2] if len(ordered) % 2 else (
+            ordered[len(ordered) // 2 - 1] + ordered[len(ordered) // 2]
+        ) / 2,
+        "min": ordered[0],
+        "max": ordered[-1],
+        "p10": ordered[int(.1 * len(ordered))],
+        "p90": ordered[int(.9 * len(ordered))],
+    })
+    return summary
+
+
+def save_score_report(data, output_path):
+    report = {
+        "summary": build_score_summary(data),
+        "items": data,
+    }
+    dump_json(report, output_path)
+    return report
+
+
+def summarize_scores(data):
+    summary = build_score_summary(data)
+    if not summary["valid_scores"]:
         print("没有有效打分")
         return
-    print(f"有效打分 {len(scores)}/{len(data)}  |  "
-          f"mean={sum(scores) / len(scores):.1f}  median={scores[len(scores) // 2]}  "
-          f"min={scores[0]}  max={scores[-1]}  "
-          f"p10={scores[int(.1 * len(scores))]}  p90={scores[int(.9 * len(scores))]}")
-    for lo, hi in [(0, 0), (1, 20), (21, 40), (41, 60), (61, 80), (81, 100)]:
-        n = sum(1 for s in scores if lo <= s <= hi)
-        print(f"{lo:3d}-{hi:3d}: {n:3d}  {'█' * int(60 * n / len(scores))}")
+    print(f"有效打分 {summary['valid_scores']}/{summary['total']}  |  "
+          f"mean={summary['mean']:.1f}  median={summary['median']}  "
+          f"min={summary['min']}  max={summary['max']}  "
+          f"p10={summary['p10']}  p90={summary['p90']}")
+    for label, n in summary["distribution"].items():
+        print(f"{label:>7}: {n:3d}  {'█' * int(60 * n / summary['valid_scores'])}")
 
 
 if __name__ == '__main__':
