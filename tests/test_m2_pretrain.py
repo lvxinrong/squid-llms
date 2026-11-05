@@ -3,7 +3,6 @@
 链路：pack_tokens 打包 → create_stream_loader → 小 GPT 预训练
       → bpb 曲线 → generate_text 咿呀学语 → save_checkpoint 带 config。
 """
-import math
 from pathlib import Path
 
 import torch
@@ -11,7 +10,7 @@ import torch
 from squid.data.token_stream import pack_tokens, create_stream_loader
 from squid.device import get_device
 from squid.generate.text import generate_text
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.train.common import calc_loss_loader
 from squid.train.pretrain import pretrain_model
 from squid.tokenizer.my_bpe_tokenizer import MyBPETokenizer

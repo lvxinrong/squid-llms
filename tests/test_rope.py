@@ -1,7 +1,7 @@
 import torch
 
-from squid.model.rope_gpt.gpt import GPTModelRoPE
-from squid.model.rope_gpt.rope import (
+from squid.model.v2_rope.gpt import GPTModelRoPE
+from squid.model.v2_rope.rope import (
     compute_inv_freq,
     compute_cos_sin,
     apply_rope,

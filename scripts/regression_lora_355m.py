@@ -12,7 +12,7 @@ from squid.checkpoints.store import load_checkpoint
 from squid.device import get_device
 from squid.eval.generate import generate_responses
 from squid.eval.judge import score_entries, summarize_scores
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.model.lora import replace_linear_with_lora
 from squid.tokenizer import TiktokenTokenizer
 

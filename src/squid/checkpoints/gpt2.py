@@ -1,5 +1,5 @@
 import torch
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 
 
 def load_pretrained_gpt(config, weights_path="gpt2_335M.pth", device="cpu"):

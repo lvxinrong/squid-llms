@@ -3,7 +3,7 @@ import torch
 
 from squid.data.classify import ClassifyDataset, classify_collate
 from squid.device import get_device
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.tokenizer import TiktokenTokenizer
 from squid.train.classify import prepare_classify_model, train_classifier_model
 

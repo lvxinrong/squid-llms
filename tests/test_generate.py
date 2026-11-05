@@ -1,7 +1,7 @@
 import torch
 
 from squid.generate.engine import generate
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.tokenizer import TiktokenTokenizer
 
 TEST_CFG = {

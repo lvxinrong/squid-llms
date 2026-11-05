@@ -1,8 +1,7 @@
-import torch
 from torch import nn
 
-from squid.model.layers import LayerNorm
-from squid.model.rope_gpt.layers import RoPETransformerBlock
+from squid.model.v1_gpt.layers import LayerNorm
+from squid.model.v2_rope.layers import RoPETransformerBlock
 
 class GPTModelRoPE(nn.Module):
     def __init__(self, cfg):

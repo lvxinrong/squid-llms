@@ -1,6 +1,6 @@
 import torch
 
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 
 # 测试用小配置：跑得动就行，不追求模型能力
 TEST_CFG = {

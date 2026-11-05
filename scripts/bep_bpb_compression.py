@@ -1,12 +1,7 @@
-import math
 from pathlib import Path
-import torch
-from squid.data.pretrain import create_pretrain_loader
 from squid.device import get_device
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.tokenizer.my_bpe_tokenizer import MyBPETokenizer
-from squid.train.common import calc_loss_loader
-from squid.train.pretrain import pretrain_model
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "blog"

@@ -1,9 +1,8 @@
 import pytest
-import torch
 
 from squid.eval.generate import generate_responses
 from squid.eval.judge import parse_score, summarize_scores
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.tokenizer import TiktokenTokenizer
 
 

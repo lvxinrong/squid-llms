@@ -2,7 +2,7 @@ import torch
 
 from squid.checkpoints import lora as lora_store
 from squid.checkpoints import store
-from squid.model.gpt import GPTModel
+from squid.model.v1_gpt.gpt import GPTModel
 from squid.model.lora import replace_linear_with_lora
 
 TEST_CFG = {

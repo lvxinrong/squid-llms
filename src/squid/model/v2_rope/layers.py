@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 
-from squid.model.layers import LayerNorm, FeedForward
-from squid.model.rope_gpt.rope import (
+from squid.model.v1_gpt.layers import LayerNorm, FeedForward
+from squid.model.v2_rope.rope import (
     compute_inv_freq,
     compute_cos_sin,
     apply_rope,

@@ -36,7 +36,7 @@ def load_model(path, device=None):
     device=None 时自动探测。
     """
     from squid.device import get_device
-    from squid.model.gpt import GPTModel
+    from squid.model.v1_gpt.gpt import GPTModel
 
     checkpoint = load_checkpoint(path)
     model = GPTModel(checkpoint["config"])
