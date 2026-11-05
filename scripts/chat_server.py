@@ -1,11 +1,11 @@
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-
-from squid.checkpoints.store import load_model
 from squid.device import get_device
-from squid.generate.chat import ChatSession
-from squid.tokenizer import TiktokenTokenizer
+from squid.generate.chat import ChatSession, build_qwen_chat_prompt
+from squid.checkpoints.qwen import load_qwen2_5
+from squid.tokenizer.qwen_tokenizer import QwenTokenizerAdapter
+from functools import partial
 
 SESSION = None
 
@@ -62,16 +62,26 @@ class ChatHandler(BaseHTTPRequestHandler):
 def main():
     global SESSION
     root = Path(__file__).resolve().parents[1]
-    checkpoint_path = root / "data/model_pth/gpt2_355M_instruct.pth"
+    weights_path = root / "data/model_pth/qwen/qwen2_5-0_5b-instruct.safetensors"
 
-    model, _ = load_model(checkpoint_path, get_device())
-    model.eval()
+    model = load_qwen2_5(weights_path, device=get_device())
+    tokenizer = QwenTokenizerAdapter("Qwen/Qwen2.5-0.5B-Instruct")
 
-    tokenizer = TiktokenTokenizer("gpt2")
-    SESSION = ChatSession(model, tokenizer)
+    prompt_builder = partial(
+        build_qwen_chat_prompt,
+        tokenizer.tokenizer,
+    )
+
+    SESSION = ChatSession(
+        model,
+        tokenizer,
+        max_new_tokens=128,
+        context_size=1024,
+        prompt_builder=prompt_builder,
+    )
 
     server = HTTPServer(("127.0.0.1", 8000), ChatHandler)
-    print("lvchat server: http://127.0.0.1:8000/chat")
+    print("lvchat server: http://127.0.0.1:8000/")
     server.serve_forever()
 
 

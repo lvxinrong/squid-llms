@@ -47,7 +47,7 @@ def test_m5_sft_eval_pipeline():
     root = Path("/Users/lv/lv_repo/squid-llms")
     tokenizer = TiktokenTokenizer("gpt2")
     device = get_device()
-    model, _ = load_model(root / "data/model_pth/gpt2_355M_instruct.pth", device)
+    model, _ = load_model(root / "data/model_pth/gpt2/gpt2_355M_instruct.pth", device)
     model.eval()
 
     data = json.loads(

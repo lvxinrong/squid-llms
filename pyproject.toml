@@ -12,6 +12,9 @@ dependencies = [
     "matplot>=0.1.9",
     "tqdm>=4.70.1",
     "openai>=3.37.0",
+    "safetensors>=0.8.0",
+    "huggingface-hub>=2.4.0",
+    "transformers>=5.22.1",
 ]
 
 [build-system]

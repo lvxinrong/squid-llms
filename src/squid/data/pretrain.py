@@ -10,9 +10,8 @@ class PretrainDataset(Dataset):
         self.target_ids = []
 
         text_ids = tokenizer.encode(text)
-        # stride 是重叠长度，前一个序列和后一个序列重叠多少，一般是max_length的一半
-        # 重叠不只"解决上下文割裂"，它还让同样一篇文本切出更多样本（stride 越小样本越多），数据利用率上去了——但代价是训练步数变多、而且样本之间近似重复，边际收益递减。所以 stride 是个旋钮
-        # 不是越大越好也不是越小越好，一半是个经验上的甜点。
+        # stride 是相邻窗口的起始位置间隔；重叠长度为 max_length - stride。
+        # stride 越小，样本越多且近似重复越多；stride = max_length 时窗口不重叠。
         for i in range(0, len(text_ids) - max_length, stride):
             self.input_ids.append(text_ids[i: i + max_length])
             self.target_ids.append(text_ids[i + 1 : i + max_length + 1])

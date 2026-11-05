@@ -9,7 +9,7 @@ from squid.tokenizer import TiktokenTokenizer
 
 def test_gpt_edited_hard_score():
     root = Path("/Users/lv/lv_repo/squid-llms")
-    checkpoint_path = root / "data/model_pth/gpt2_355M_instruct_gpt_v1.pth"
+    checkpoint_path = root / "data/model_pth/experiments/weight_edit/gpt2_355M_instruct_gpt_v1.pth"
     model, checkpoint = load_model(checkpoint_path, get_device())
     model.eval()
 

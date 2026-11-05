@@ -8,7 +8,7 @@ from squid.tokenizer import TiktokenTokenizer
 
 def main():
     root = Path(__file__).resolve().parents[1]
-    checkpoint_path = root / "data/model_pth/gpt2_355M_instruct.pth"
+    checkpoint_path = root / "data/model_pth/gpt2/gpt2_355M_instruct.pth"
     model, _ = load_model(checkpoint_path, get_device())
     model.eval()
     tokenizer = TiktokenTokenizer("gpt2")

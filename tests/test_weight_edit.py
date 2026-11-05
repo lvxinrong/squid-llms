@@ -10,7 +10,7 @@ from squid.tokenizer import TiktokenTokenizer
 def test_base_line_score():
     tokenizer = TiktokenTokenizer("gpt2")
     root = Path("/Users/lv/lv_repo/squid-llms")
-    sft_path = root / "data/model_pth/gpt2_355M_instruct.pth"
+    sft_path = root / "data/model_pth/gpt2/gpt2_355M_instruct.pth"
     model, checkpoint = load_model(sft_path, get_device())
     model.eval()
 

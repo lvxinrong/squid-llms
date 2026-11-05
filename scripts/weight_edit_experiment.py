@@ -14,7 +14,7 @@ from squid.weight_edit import apply_scale_row_patch
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / "data" / "weight_edit"
-BASE_CHECKPOINT = ROOT / "data" / "model_pth" / "gpt2_355M_instruct.pth"
+BASE_CHECKPOINT = ROOT / "data" / "model_pth" / "gpt2" / "gpt2_355M_instruct.pth"
 BASE_REPORT = ROOT / "data" / "instruct" / "m5-report-sft-20.json"
 
 

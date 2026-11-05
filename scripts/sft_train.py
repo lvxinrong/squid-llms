@@ -86,8 +86,8 @@ def train_instruct_model():
         "min_lr": 1e-6,
     }
     device = get_device()
-    pretrained_gpt_path =  Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M.pth")
-    instruct_checkpoint_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M_instruct.pth")
+    pretrained_gpt_path =  Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M.pth")
+    instruct_checkpoint_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M_instruct.pth")
     instruct_train_data_path = Path("/Users/lv/lv_repo/squid-llms/data/instruct/instruction-data.json")
     if not instruct_checkpoint_path.exists():
         # 训练部分

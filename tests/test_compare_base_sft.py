@@ -45,10 +45,10 @@ def test_compare_base_sft_testdata():
         "qkv_bias": True
     }
     device = get_device()
-    base_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M.pth")
+    base_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M.pth")
     baseModel = load_pretrained_gpt(cfg, base_path, device)
     baseModel.eval()
-    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M_instruct.pth")
+    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M_instruct.pth")
     sftModel, _ = load_model(sft_path, device)
     sftModel.eval()
     instruct_train_data_path = Path("/Users/lv/lv_repo/squid-llms/data/instruct/instruction-data.json")
@@ -87,7 +87,7 @@ def test_sft_generate_kv_cache():
         "qkv_bias": True
     }
     device = get_device()
-    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M_instruct.pth")
+    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M_instruct.pth")
     sftModel, _ = load_model(sft_path, device)
     sftModel.eval()
     instruct_train_data_path = Path("/Users/lv/lv_repo/squid-llms/data/instruct/instruction-data.json")

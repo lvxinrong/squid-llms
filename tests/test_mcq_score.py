@@ -10,10 +10,10 @@ from squid.tokenizer import TiktokenTokenizer
 
 
 def load_gpt_model(cfg, tokenizer, device):
-    base_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M.pth")
+    base_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M.pth")
     baseModel = load_pretrained_gpt(cfg, base_path, device)
     baseModel.eval()
-    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2_355M_instruct.pth")
+    sft_path = Path("/Users/lv/lv_repo/squid-llms/data/model_pth/gpt2/gpt2_355M_instruct.pth")
     sftModel, _ = load_model(sft_path, device)
     sftModel.eval()
 
