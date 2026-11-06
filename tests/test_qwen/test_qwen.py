@@ -8,7 +8,7 @@ from squid.tokenizer.qwen_tokenizer import QwenTokenizerAdapter
 
 
 def test_qwen_load_and_generate():
-    root = Path("/Users/lv/lv_repo/squid-llms")
+    root = Path(__file__).resolve().parents[2]
     weights = root / "data/model_pth/qwen/qwen2_5-0_5b.safetensors"
     model = load_qwen2_5(weights)
     tokenizer = QwenTokenizerAdapter()

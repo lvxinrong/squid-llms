@@ -28,6 +28,7 @@ def _fake_df():
 
 
 def test_train_classify_model():
+    torch.manual_seed(123)
     device = get_device()
     tokenizer = TiktokenTokenizer("gpt2")
     df = _fake_df()
@@ -56,7 +57,7 @@ def test_train_classify_model():
     )
     train_losses, val_losses, train_accs, val_accs, _ = train_classifier_model(
         model, loader, loader, optimizer, device,
-        num_epochs=2, eval_freq=5, eval_iter=2,
+        num_epochs=2, eval_freq=5, eval_iter=None,
     )
 
     # 验收第二关：loss 下降

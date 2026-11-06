@@ -2,185 +2,956 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>lvchat · 本地模型对话</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>lvchat · 本地模型单会话实验台</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f6fb;
-      --surface: rgba(255, 255, 255, 0.88);
-      --text: #202333;
-      --muted: #73788b;
-      --line: #e4e7f0;
-      --accent: #635bff;
-      --user: #635bff;
+      --bg: #f3f4f8;
+      --canvas: #f7f8fc;
+      --surface: #ffffff;
+      --surface-subtle: #f1f3f9;
+      --surface-tint: #eef0fa;
+      --code-bg: #f4f6fb;
+      --code-header-bg: #ebedf6;
+      --text: #181b26;
+      --text-secondary: #43495e;
+      --muted: #6c7288;
+      --line: #dfe3ee;
+      --line-strong: #cbd1e2;
+      --accent: #5850ec;
+      --accent-hover: #4940df;
+      --accent-soft: rgba(88, 80, 236, 0.09);
+      --accent-border: rgba(88, 80, 236, 0.26);
+      --accent-ring: rgba(88, 80, 236, 0.18);
+      --user-bg: linear-gradient(135deg, #564ee8 0%, #4854e8 100%);
+      --user-text: #ffffff;
+      --assistant-bg: #ffffff;
+      --error-bg: #fff5f4;
+      --error-border: #f1b9b4;
+      --error-text: #a12319;
+      --ok-dot: #169c5e;
+      --busy-dot: #d97706;
+      --stage-max: 1160px;
+      --shadow-sm: 0 2px 6px rgba(20, 24, 46, 0.04);
+      --shadow-md: 0 10px 30px rgba(24, 28, 56, 0.06), 0 2px 8px rgba(24, 28, 56, 0.03);
+      --shadow-composer: 0 12px 36px rgba(26, 31, 64, 0.07), 0 2px 6px rgba(26, 31, 64, 0.04);
+      --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
 
     body {
-      margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 32px 16px;
+      min-height: 100dvh;
       color: var(--text);
-      background:
-        radial-gradient(circle at 12% 8%, rgba(99, 91, 255, 0.12), transparent 34%),
-        radial-gradient(circle at 88% 90%, rgba(41, 170, 225, 0.10), transparent 36%),
-        var(--bg);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      background: var(--bg);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow: hidden;
     }
 
+    /* 全屏实验台骨架 */
     .app {
-      width: min(860px, 100%);
-      height: min(780px, calc(100vh - 64px));
-      min-height: 480px;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
+      background-color: var(--canvas);
+      background-image:
+        radial-gradient(circle at 12% 0%, rgba(88, 80, 236, 0.08), transparent 42%),
+        radial-gradient(circle at 88% 100%, rgba(56, 139, 253, 0.07), transparent 42%),
+        radial-gradient(rgba(108, 114, 136, 0.14) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px;
+      background-position: 0 0, 0 0, -1px -1px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-radius: 24px;
-      background: var(--surface);
-      box-shadow: 0 24px 80px rgba(40, 45, 80, 0.10);
-      backdrop-filter: blur(18px);
     }
 
+    /* 顶部全宽实验台导航栏 */
     header {
+      flex-shrink: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+      z-index: 10;
+    }
+
+    .header-inner {
+      max-width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 14px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 20px 24px;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .logo {
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      color: #ffffff;
+      background: linear-gradient(140deg, #6259f7 0%, #4568f5 100%);
+      box-shadow: 0 4px 12px rgba(88, 80, 236, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      user-select: none;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 750;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+
+    .brand-badge {
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .model {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.4;
+      font-family: var(--font-mono);
+    }
+
+    .telemetry-bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.3;
+      white-space: nowrap;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .pill-mono {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+    }
+
+    .pill-label {
+      color: var(--muted);
+    }
+
+    .pill-strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok-dot);
+      box-shadow: 0 0 0 3px rgba(22, 156, 94, 0.14);
+      flex-shrink: 0;
+    }
+
+    .status-dot.busy {
+      background: var(--busy-dot);
+      box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
+      animation: pulse 1.3s ease-in-out infinite;
+    }
+
+    .status-dot.error {
+      background: var(--error-text);
+      box-shadow: 0 0 0 3px rgba(161, 35, 25, 0.15);
+    }
+
+    /* 中央全屏滚动实验画布 */
+    .chat {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      overflow-y: auto;
+      padding: 36px 32px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+
+    /* 初始状态：大尺寸工程蓝图式欢迎面板 */
+    .welcome {
+      width: min(var(--stage-max), 100%);
+      margin: auto 0;
+      padding: 40px 44px;
+      border-radius: 22px;
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, #ffffff 0%, #fafbfe 100%);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .welcome::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #5850ec 0%, #4b7bec 50%, #7d77f8 100%);
+    }
+
+    .welcome-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding-bottom: 26px;
       border-bottom: 1px solid var(--line);
     }
 
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      display: grid;
+    .welcome-copy {
+      max-width: 640px;
+    }
+
+    .welcome-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .welcome h2 {
+      margin: 0 0 12px;
+      color: var(--text);
+      font-size: clamp(24px, 2.6vw, 30px);
+      font-weight: 750;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+    }
+
+    .welcome p {
+      margin: 0;
+      font-size: 15.5px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+
+    .pipeline-box {
+      flex-shrink: 0;
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--surface-subtle);
+      min-width: 270px;
+    }
+
+    .pipeline-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+    }
+
+    .pipeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-index {
+      display: inline-grid;
       place-items: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 12px;
-      color: white;
-      background: linear-gradient(135deg, #756bff, #4f8ff7);
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      color: var(--accent);
+      font-size: 10.5px;
       font-weight: 700;
     }
-    h1 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
-    .model { color: var(--muted); font-size: 12px; }
 
-    .chat {
-      flex: 1;
-      overflow-y: auto;
-      padding: 26px 24px;
-      scroll-behavior: smooth;
+    .welcome-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 24px;
     }
 
-    .welcome {
-      max-width: 520px;
-      margin: 56px auto;
-      text-align: center;
-      color: var(--muted);
-      line-height: 1.8;
-    }
-    .welcome h2 { color: var(--text); font-size: 24px; margin-bottom: 8px; }
-
-    .message {
+    .spec-card {
+      padding: 18px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--surface);
       display: flex;
-      margin: 16px 0;
+      flex-direction: column;
+      gap: 6px;
     }
-    .message.user { justify-content: flex-end; }
+
+    .spec-index {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .spec-title {
+      font-size: 14.5px;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .spec-code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: var(--surface-subtle);
+      align-self: flex-start;
+    }
+
+    .spec-desc {
+      margin: 2px 0 0;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    /* 消息行与气泡：宽画布展开 */
+    .message {
+      width: min(var(--stage-max), 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 7px;
+      min-width: 0;
+      animation: fadeIn 0.18s ease-out;
+    }
+
+    .message.user {
+      align-items: flex-end;
+    }
+
+    .msg-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      line-height: 1.3;
+      user-select: none;
+    }
+
     .bubble {
-      max-width: 78%;
-      padding: 12px 16px;
-      border-radius: 18px;
+      max-width: min(86%, 880px);
+      min-width: 0;
+      max-height: none;
+      overflow: visible;
+      padding: 16px 22px;
+      border-radius: 16px;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
-      line-height: 1.65;
-      font-size: 15px;
+      word-break: break-word;
+      tab-size: 4;
+      line-height: 1.76;
+      font-size: 15.5px;
+      letter-spacing: 0.005em;
     }
+
     .assistant .bubble {
-      background: #fff;
-      border: 1px solid var(--line);
+      background: var(--assistant-bg);
+      color: var(--text);
+      border: 1px solid var(--line-strong);
+      border-left: 3px solid var(--accent);
       border-top-left-radius: 6px;
+      box-shadow: var(--shadow-sm);
+      white-space: normal;
     }
+
     .user .bubble {
-      color: white;
-      background: var(--user);
+      max-width: min(78%, 760px);
+      background: var(--user-bg);
+      color: var(--user-text);
+      border: 1px solid rgba(68, 60, 212, 0.35);
       border-top-right-radius: 6px;
+      box-shadow: 0 6px 18px rgba(88, 80, 236, 0.16);
     }
-    .error .bubble { color: #b42318; background: #fff1f0; }
+
+    .error .bubble {
+      max-width: min(88%, 880px);
+      color: var(--error-text);
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      border-left: 3px solid var(--error-text);
+      border-top-left-radius: 6px;
+      font-size: 14.5px;
+    }
+
+    .pending .bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      color: var(--text-secondary);
+      background: var(--surface);
+      border: 1px dashed var(--accent-border);
+      font-size: 14.5px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .pending-indicator {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    /* 安全 Markdown 排版样式（仅作用于助手气泡内部 DOM 节点） */
+    .assistant .bubble > :first-child {
+      margin-top: 0;
+    }
+
+    .assistant .bubble > :last-child {
+      margin-bottom: 0;
+    }
+
+    .md-p {
+      margin: 0 0 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .md-heading {
+      margin: 18px 0 10px;
+      color: var(--text);
+      font-weight: 700;
+      line-height: 1.38;
+      letter-spacing: -0.015em;
+    }
+
+    .md-h1 { font-size: 20px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+    .md-h2 { font-size: 18px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+    .md-h3 { font-size: 16.5px; }
+    .md-h4, .md-h5, .md-h6 { font-size: 15.5px; color: var(--text-secondary); }
+
+    .md-ul,
+    .md-ol {
+      margin: 0 0 12px;
+      padding-left: 22px;
+    }
+
+    .md-li {
+      margin: 4px 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .md-quote {
+      margin: 12px 0;
+      padding: 8px 14px;
+      border-left: 3px solid var(--line-strong);
+      background: var(--surface-subtle);
+      border-radius: 0 8px 8px 0;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+    }
+
+    .md-hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 14px 0;
+    }
+
+    .md-inline-code {
+      padding: 2px 6px;
+      margin: 0 1px;
+      border-radius: 5px;
+      background: var(--surface-tint);
+      border: 1px solid rgba(88, 80, 236, 0.16);
+      color: #3f38c9;
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .md-pre {
+      margin: 12px 0;
+      border-radius: 11px;
+      border: 1px solid var(--line-strong);
+      background: var(--code-bg);
+      overflow: hidden;
+    }
+
+    .md-code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      background: var(--code-header-bg);
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      user-select: none;
+    }
+
+    .md-code-lang {
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: lowercase;
+    }
+
+    .md-code {
+      display: block;
+      padding: 13px 16px;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      tab-size: 4;
+    }
+
+    .md-table-wrap {
+      margin: 12px 0;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .md-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .md-table th,
+    .md-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .md-table th:last-child,
+    .md-table td:last-child {
+      border-right: 0;
+    }
+
+    .md-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .md-table th {
+      background: var(--surface-subtle);
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .md-link {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .md-link:hover {
+      color: var(--accent-hover);
+    }
+
+    /* 底部全宽实验控制台 */
+    .composer-wrap {
+      flex-shrink: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--line);
+      padding: 16px 32px 18px;
+      z-index: 10;
+    }
+
+    .composer-stage {
+      width: min(var(--stage-max), 100%);
+      margin: 0 auto;
+    }
+
+    .status-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--error-border);
+      background: var(--error-bg);
+      color: var(--error-text);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .status-banner.visible {
+      display: flex;
+    }
 
     .composer {
       display: flex;
       align-items: flex-end;
-      gap: 12px;
-      margin: 0 20px 12px;
-      padding: 10px;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: #fff;
+      gap: 14px;
+      padding: 10px 12px 10px 18px;
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow-composer);
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
     }
+
+    .composer:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-ring), var(--shadow-composer);
+    }
+
     textarea {
       flex: 1;
-      min-height: 40px;
-      max-height: 140px;
+      min-width: 0;
+      min-height: 44px;
+      max-height: 180px;
+      height: 44px;
       resize: none;
       border: 0;
       outline: 0;
-      padding: 9px 8px;
+      padding: 10px 2px;
       color: var(--text);
       background: transparent;
-      font: inherit;
-      line-height: 1.5;
+      font-family: var(--font-sans);
+      font-size: 15.5px;
+      line-height: 1.55;
+      overflow-y: hidden;
     }
+
+    textarea::placeholder {
+      color: var(--muted);
+    }
+
+    textarea:focus-visible {
+      outline: none;
+    }
+
     button {
-      min-width: 76px;
-      height: 40px;
-      border: 0;
+      flex-shrink: 0;
+      min-width: 104px;
+      height: 44px;
+      padding: 0 20px;
+      border: 1px solid transparent;
       border-radius: 12px;
-      color: white;
+      color: #ffffff;
       background: var(--accent);
-      font: inherit;
+      font-family: var(--font-sans);
+      font-size: 14.5px;
       font-weight: 600;
+      letter-spacing: 0.01em;
       cursor: pointer;
+      box-shadow: 0 4px 12px rgba(88, 80, 236, 0.22);
+      transition: background-color 0.15s ease, opacity 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
     }
-    button:disabled { opacity: 0.55; cursor: wait; }
-    .hint { margin: 0 24px 16px; color: var(--muted); font-size: 11px; text-align: center; }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-hover);
+      box-shadow: 0 6px 16px rgba(88, 80, 236, 0.28);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button[aria-busy="true"] {
+      cursor: wait;
+    }
+
+    .footer-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: 10px;
+      padding: 0 4px;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .kbd-hint {
+      color: var(--muted);
+      font-size: 11.5px;
+      font-family: var(--font-mono);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.32; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .welcome-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pipeline-box {
+        width: 100%;
+      }
+    }
 
     @media (max-width: 640px) {
-      body { padding: 0; }
-      .app { height: 100vh; min-height: 0; border-radius: 0; }
-      header { padding: 16px; }
-      .chat { padding: 18px 14px; }
-      .bubble { max-width: 88%; }
-      .composer { margin: 0 12px 10px; }
+      .header-inner {
+        padding: 12px 16px;
+      }
+
+      .chat {
+        padding: 20px 14px 16px;
+        gap: 16px;
+      }
+
+      .welcome {
+        padding: 22px 18px;
+        border-radius: 16px;
+      }
+
+      .welcome h2 {
+        font-size: 21px;
+      }
+
+      .bubble,
+      .user .bubble,
+      .error .bubble {
+        max-width: 92%;
+        padding: 12px 15px;
+        font-size: 14.5px;
+      }
+
+      .composer-wrap {
+        padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+      }
+
+      .composer {
+        padding: 8px 8px 8px 13px;
+        gap: 8px;
+      }
+
+      button {
+        min-width: 82px;
+        padding: 0 14px;
+      }
+
+      .kbd-hint {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
   <main class="app">
     <header>
-      <div class="brand">
-        <div class="logo">lv</div>
-        <div>
-          <h1>lvchat</h1>
-          <div class="model">model_v3 · Qwen2.5-0.5B Instruct · 本地推理</div>
+      <div class="header-inner">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">lv</div>
+          <div>
+            <div class="brand-title">
+              <h1>lvchat</h1>
+              <span class="brand-badge">LOCAL LLM WORKBENCH</span>
+            </div>
+            <div class="model">model_v3 · Qwen2.5-0.5B Instruct · 本地推理</div>
+          </div>
+        </div>
+
+        <div class="telemetry-bar" aria-label="实验台运行状态">
+          <span class="pill pill-mono">
+            <span class="pill-label">SESSION</span>
+            <span class="pill-strong">Single · 连续上下文</span>
+          </span>
+          <span class="pill pill-mono">
+            <span class="pill-label">TURNS</span>
+            <span id="turn-counter" class="pill-strong">00</span>
+          </span>
+          <span class="pill">
+            <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+            <span id="status-text">就绪 · 等待输入</span>
+          </span>
         </div>
       </div>
     </header>
 
-    <section id="chat" class="chat" aria-live="polite">
+    <section id="chat" class="chat" aria-live="polite" aria-busy="false">
       <div id="welcome" class="welcome">
-        <h2>和自己的模型聊一句</h2>
-        <p>这是从零手搓模型、训练、评估到对话界面的最小闭环。<br>模型还很小，回答不完美，但每一行都在本地运行。</p>
+        <div class="welcome-top">
+          <div class="welcome-copy">
+            <span class="welcome-eyebrow">EXP // MODEL_V3 × QWEN2.5-0.5B</span>
+            <h2>和自己的模型聊一句</h2>
+            <p>这是从零手搓模型、承接权重、训练评估到本地对话界面的最小闭环。<br>模型体量只有 0.5B，回答未必完美，但每一次推理都在你的本地机器上真实发生。</p>
+          </div>
+          <div class="pipeline-box" aria-label="本地推理链路">
+            <div class="pipeline-title">LOCAL INFERENCE PIPELINE</div>
+            <div class="pipeline-steps">
+              <div class="pipeline-step"><span class="step-index">1</span><span>输入实验 Prompt</span></div>
+              <div class="pipeline-step"><span class="step-index">2</span><span>POST /chat 同步请求</span></div>
+              <div class="pipeline-step"><span class="step-index">3</span><span>model_v3 本地单线程生成</span></div>
+              <div class="pipeline-step"><span class="step-index">4</span><span>完整回答一次性返回</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="welcome-grid">
+          <div class="spec-card">
+            <span class="spec-index">01 / ARCHITECTURE</span>
+            <span class="spec-title">手搓架构与权重承接</span>
+            <span class="spec-code">model_v3 + Qwen2.5-0.5B Instruct</span>
+            <p class="spec-desc">本地直接加载模型权重完成前向推理，不依赖外部云端大模型 API。</p>
+          </div>
+          <div class="spec-card">
+            <span class="spec-index">02 / SESSION MODE</span>
+            <span class="spec-title">单会话连续实验</span>
+            <span class="spec-code">Single Session · Stateful</span>
+            <p class="spec-desc">当前服务端维护单一连续会话上下文，适合多轮追问与指令跟随测试。</p>
+          </div>
+          <div class="spec-card">
+            <span class="spec-index">03 / OUTPUT BOUNDARY</span>
+            <span class="spec-title">安全 Markdown 排版</span>
+            <span class="spec-code">DOM Node · Zero innerHTML</span>
+            <p class="spec-desc">基于原生 DOM 节点安全解析常见 Markdown 与代码块，兼顾易读性与防 XSS 注入。</p>
+          </div>
+        </div>
       </div>
     </section>
 
-    <form id="chat-form" class="composer" autocomplete="off">
-      <textarea id="message" rows="1" aria-label="消息" placeholder="输入消息，Enter 发送，Shift+Enter 换行" required></textarea>
-      <button id="send" type="submit">发送</button>
-    </form>
-    <p class="hint">当前为单会话演示 · 模型能力有限，请把回答当作实验结果</p>
+    <div class="composer-wrap">
+      <div class="composer-stage">
+        <div id="error-banner" class="status-banner" role="alert" aria-live="assertive"></div>
+        <form id="chat-form" class="composer" autocomplete="off" novalidate onsubmit="event.preventDefault(); return false;">
+          <textarea
+            id="message"
+            rows="1"
+            aria-label="输入消息"
+            placeholder="输入实验问题、多轮对话或代码片段（Enter 发送，Shift+Enter 换行）"
+          ></textarea>
+          <button id="send" type="button">发送</button>
+        </form>
+        <div class="footer-meta">
+          <p class="hint">当前为单会话实验 · 非流式同步返回 · 模型能力有限，请把回答当作实验结果</p>
+          <span class="kbd-hint">Enter 发送 · Shift+Enter 换行 · POST /chat</span>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -189,31 +960,419 @@
     const sendButton = document.getElementById('send');
     const chat = document.getElementById('chat');
     const welcome = document.getElementById('welcome');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const turnCounter = document.getElementById('turn-counter');
+    const errorBanner = document.getElementById('error-banner');
 
-    function addMessage(text, role) {
-      const row = document.createElement('div');
-      row.className = `message ${role}`;
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble';
-      bubble.textContent = text;
-      row.appendChild(bubble);
-      chat.appendChild(row);
+    let isRequesting = false;
+    let isComposing = false;
+    let lastCompositionEndTime = 0;
+    let turnCount = 0;
+
+    const MAX_INPUT_HEIGHT = 180;
+    const MIN_INPUT_HEIGHT = 44;
+    const SCROLL_THRESHOLD = 90;
+
+    function isNearBottom() {
+      const chatRemaining = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+      return chatRemaining <= SCROLL_THRESHOLD;
+    }
+
+    function scrollToBottom(shouldScroll = false) {
+      if (!shouldScroll) return;
       chat.scrollTop = chat.scrollHeight;
     }
 
+    function syncInputHeight() {
+      input.style.height = 'auto';
+      const scrollHeight = input.scrollHeight;
+      const nextHeight = Math.min(Math.max(scrollHeight, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT);
+      input.style.height = `${nextHeight}px`;
+      input.style.overflowY = scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
+    }
+
+    function updateSendState() {
+      const hasContent = input.value.trim().length > 0;
+      sendButton.disabled = isRequesting || !hasContent;
+      sendButton.setAttribute('aria-busy', isRequesting ? 'true' : 'false');
+      sendButton.textContent = isRequesting ? '生成中…' : '发送';
+    }
+
+    function setWorkbenchStatus(state, text) {
+      statusDot.className = 'status-dot';
+      if (state === 'busy') statusDot.classList.add('busy');
+      if (state === 'error') statusDot.classList.add('error');
+      statusText.textContent = text;
+    }
+
+    function showErrorBanner(text) {
+      if (!text) {
+        errorBanner.textContent = '';
+        errorBanner.classList.remove('visible');
+        return;
+      }
+      errorBanner.textContent = text;
+      errorBanner.classList.add('visible');
+    }
+
+    const INLINE_MD_PATTERN = /(`[^`\n]+`)|(\*\*\*[^\n]+?\*\*\*)|(\*\*[^\n]+?\*\*|__[^\n]+?__)|(~~[^\n]+?~~)|(\*[^\s*](?:[^\n*]*?[^\s*])?\*)|(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))/g;
+
+    function appendInlineMarkdown(parent, text) {
+      if (!text) return;
+      let lastIndex = 0;
+      const regex = new RegExp(INLINE_MD_PATTERN.source, 'g');
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+        }
+
+        if (match[1]) {
+          const code = document.createElement('code');
+          code.className = 'md-inline-code';
+          code.textContent = match[1].slice(1, -1);
+          parent.appendChild(code);
+        } else if (match[2]) {
+          const strong = document.createElement('strong');
+          const em = document.createElement('em');
+          appendInlineMarkdown(em, match[2].slice(3, -3));
+          strong.appendChild(em);
+          parent.appendChild(strong);
+        } else if (match[3]) {
+          const strong = document.createElement('strong');
+          appendInlineMarkdown(strong, match[3].slice(2, -2));
+          parent.appendChild(strong);
+        } else if (match[4]) {
+          const del = document.createElement('del');
+          appendInlineMarkdown(del, match[4].slice(2, -2));
+          parent.appendChild(del);
+        } else if (match[5]) {
+          const em = document.createElement('em');
+          appendInlineMarkdown(em, match[5].slice(1, -1));
+          parent.appendChild(em);
+        } else if (match[6]) {
+          const label = match[7];
+          const rawUrl = match[8];
+          try {
+            const parsed = new URL(rawUrl);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+              const link = document.createElement('a');
+              link.className = 'md-link';
+              link.href = parsed.href;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              link.textContent = label;
+              parent.appendChild(link);
+            } else {
+              parent.appendChild(document.createTextNode(match[0]));
+            }
+          } catch {
+            parent.appendChild(document.createTextNode(match[0]));
+          }
+        }
+
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < text.length) {
+        parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+      }
+    }
+
+    function appendMultilineInline(parent, lines) {
+      lines.forEach((line, idx) => {
+        if (idx > 0) {
+          parent.appendChild(document.createElement('br'));
+        }
+        appendInlineMarkdown(parent, line);
+      });
+    }
+
+    function isTableSeparator(line) {
+      if (!line) return false;
+      return /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+    }
+
+    function splitTableCells(line) {
+      const trimmed = line.trim().replace(/^\||\|$/g, '');
+      return trimmed.split('|').map((cell) => cell.trim());
+    }
+
+    function isSpecialBlockStart(line, nextLine) {
+      if (!line || !line.trim()) return true;
+      if (/^\s*```/.test(line)) return true;
+      if (/^\s*(?:[-*_]\s*){3,}$/.test(line)) return true;
+      if (/^\s*#{1,6}\s+/.test(line)) return true;
+      if (/^\s*>\s?/.test(line)) return true;
+      if (/^\s*[-*+]\s+/.test(line)) return true;
+      if (/^\s*\d+\.\s+/.test(line)) return true;
+      if (line.includes('|') && isTableSeparator(nextLine)) return true;
+      return false;
+    }
+
+    function renderSafeMarkdown(container, rawText) {
+      container.textContent = '';
+      const normalized = String(rawText ?? '').replace(/\r\n?/g, '\n');
+      const lines = normalized.split('\n');
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // 1. 空行
+        if (!line.trim()) {
+          i += 1;
+          continue;
+        }
+
+        // 2. 围栏代码块 ```lang
+        const fenceMatch = line.match(/^\s*```([\w+-]*)\s*$/);
+        if (fenceMatch) {
+          const lang = fenceMatch[1] || 'code';
+          const codeLines = [];
+          i += 1;
+          while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+            codeLines.push(lines[i]);
+            i += 1;
+          }
+          if (i < lines.length) i += 1;
+
+          const pre = document.createElement('pre');
+          pre.className = 'md-pre';
+
+          const header = document.createElement('div');
+          header.className = 'md-code-header';
+          const langSpan = document.createElement('span');
+          langSpan.className = 'md-code-lang';
+          langSpan.textContent = lang;
+          header.appendChild(langSpan);
+          pre.appendChild(header);
+
+          const codeEl = document.createElement('code');
+          codeEl.className = 'md-code';
+          codeEl.textContent = codeLines.join('\n');
+          pre.appendChild(codeEl);
+
+          container.appendChild(pre);
+          continue;
+        }
+
+        // 3. 水平分割线 --- / ***
+        if (/^\s*(?:[-*_]\s*){3,}$/.test(line)) {
+          const hr = document.createElement('hr');
+          hr.className = 'md-hr';
+          container.appendChild(hr);
+          i += 1;
+          continue;
+        }
+
+        // 4. 标题 # ~ ######
+        const headingMatch = line.match(/^\s*(#{1,6})\s+(.+?)\s*$/);
+        if (headingMatch) {
+          const level = headingMatch[1].length;
+          const tag = level <= 2 ? 'h3' : level === 3 ? 'h4' : 'h5';
+          const heading = document.createElement(tag);
+          heading.className = `md-heading md-h${level}`;
+          appendInlineMarkdown(heading, headingMatch[2]);
+          container.appendChild(heading);
+          i += 1;
+          continue;
+        }
+
+        // 5. 引用块 >
+        if (/^\s*>\s?/.test(line)) {
+          const quoteLines = [];
+          while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+            quoteLines.push(lines[i].replace(/^\s*>\s?/, ''));
+            i += 1;
+          }
+          const quote = document.createElement('blockquote');
+          quote.className = 'md-quote';
+          appendMultilineInline(quote, quoteLines);
+          container.appendChild(quote);
+          continue;
+        }
+
+        // 6. 表格 | a | b |
+        if (line.includes('|') && isTableSeparator(lines[i + 1])) {
+          const headers = splitTableCells(line);
+          i += 2;
+          const wrap = document.createElement('div');
+          wrap.className = 'md-table-wrap';
+          const table = document.createElement('table');
+          table.className = 'md-table';
+
+          const thead = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          headers.forEach((hText) => {
+            const th = document.createElement('th');
+            appendInlineMarkdown(th, hText);
+            headRow.appendChild(th);
+          });
+          thead.appendChild(headRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
+            const cells = splitTableCells(lines[i]);
+            const tr = document.createElement('tr');
+            headers.forEach((_, colIdx) => {
+              const td = document.createElement('td');
+              appendInlineMarkdown(td, cells[colIdx] ?? '');
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+            i += 1;
+          }
+          table.appendChild(tbody);
+          wrap.appendChild(table);
+          container.appendChild(wrap);
+          continue;
+        }
+
+        // 7. 无序列表 - / * / +
+        if (/^\s*[-*+]\s+/.test(line)) {
+          const ul = document.createElement('ul');
+          ul.className = 'md-ul';
+          while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+            const itemText = lines[i].replace(/^\s*[-*+]\s+/, '');
+            const li = document.createElement('li');
+            li.className = 'md-li';
+            appendInlineMarkdown(li, itemText);
+            ul.appendChild(li);
+            i += 1;
+          }
+          container.appendChild(ul);
+          continue;
+        }
+
+        // 8. 有序列表 1. / 2.
+        const olMatch = line.match(/^\s*(\d+)\.\s+/);
+        if (olMatch) {
+          const ol = document.createElement('ol');
+          ol.className = 'md-ol';
+          const startNum = parseInt(olMatch[1], 10);
+          if (!Number.isNaN(startNum) && startNum !== 1) {
+            ol.start = startNum;
+          }
+          while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+            const itemText = lines[i].replace(/^\s*\d+\.\s+/, '');
+            const li = document.createElement('li');
+            li.className = 'md-li';
+            appendInlineMarkdown(li, itemText);
+            ol.appendChild(li);
+            i += 1;
+          }
+          container.appendChild(ol);
+          continue;
+        }
+
+        // 9. 普通段落（保留内部单行换行）
+        const paraLines = [];
+        while (i < lines.length && !isSpecialBlockStart(lines[i], lines[i + 1])) {
+          paraLines.push(lines[i]);
+          i += 1;
+        }
+        const p = document.createElement('p');
+        p.className = 'md-p';
+        appendMultilineInline(p, paraLines);
+        container.appendChild(p);
+      }
+    }
+
+    function createMessageRow(text, role, labelText) {
+      const row = document.createElement('div');
+      row.className = `message ${role}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'msg-meta';
+      meta.textContent = labelText;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      if (role === 'assistant') {
+        renderSafeMarkdown(bubble, text);
+      } else {
+        bubble.textContent = text;
+      }
+
+      row.appendChild(meta);
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function addMessage(text, role, labelText, shouldScroll = isNearBottom()) {
+      const row = createMessageRow(text, role, labelText);
+      chat.appendChild(row);
+      scrollToBottom(shouldScroll);
+      return row;
+    }
+
+    function addPendingRow(shouldScroll = isNearBottom()) {
+      const row = document.createElement('div');
+      row.className = 'message assistant pending';
+
+      const meta = document.createElement('div');
+      meta.className = 'msg-meta';
+      meta.textContent = 'model_v3 · 正在等待本地模型生成';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      const dot = document.createElement('span');
+      dot.className = 'pending-indicator';
+      dot.setAttribute('aria-hidden', 'true');
+
+      const label = document.createElement('span');
+      label.textContent = '正在等待本地模型生成完整回答…';
+
+      bubble.appendChild(dot);
+      bubble.appendChild(label);
+      row.appendChild(meta);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+
+      scrollToBottom(shouldScroll);
+      return row;
+    }
+
     function setBusy(busy) {
-      sendButton.disabled = busy;
-      sendButton.textContent = busy ? '生成中' : '发送';
+      isRequesting = busy;
+      chat.setAttribute('aria-busy', busy ? 'true' : 'false');
+      updateSendState();
+      if (busy) {
+        setWorkbenchStatus('busy', '正在等待本地模型生成…');
+      }
     }
 
     async function sendMessage() {
-      const message = input.value.trim();
-      if (!message || sendButton.disabled) return;
+      if (isRequesting) return;
 
-      if (welcome) welcome.remove();
-      addMessage(message, 'user');
+      const rawInput = input.value;
+      const message = rawInput.trim();
+      if (!message) {
+        updateSendState();
+        return;
+      }
+
+      showErrorBanner('');
+      if (welcome && welcome.parentNode) {
+        welcome.remove();
+      }
+
+      const nextTurn = turnCount + 1;
+      const turnLabel = `#${String(nextTurn).padStart(2, '0')}`;
+      const wasNearBottomOnSend = isNearBottom();
+      const userRow = addMessage(message, 'user', `你 · TURN ${turnLabel}`, wasNearBottomOnSend);
+
       input.value = '';
+      syncInputHeight();
       setBusy(true);
+
+      const pendingRow = addPendingRow(wasNearBottomOnSend);
 
       try {
         const response = await fetch('/chat', {
@@ -221,29 +1380,92 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({message}),
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         const data = await response.json();
-        addMessage(data.response || '（模型返回了空内容）', 'assistant');
+        const shouldScrollOnReply = isNearBottom();
+        pendingRow.remove();
+        turnCount = nextTurn;
+        turnCounter.textContent = String(turnCount).padStart(2, '0');
+        const reply = typeof data.response === 'string' && data.response.length > 0
+          ? data.response
+          : '（模型返回了空内容）';
+        addMessage(reply, 'assistant', `model_v3 · Qwen2.5-0.5B · TURN ${turnLabel}`, shouldScrollOnReply);
+        setWorkbenchStatus('ok', '就绪 · 同步返回');
       } catch (error) {
-        addMessage(`请求失败：${error.message}`, 'error');
+        const shouldScrollOnError = isNearBottom();
+        pendingRow.remove();
+        userRow.remove();
+
+        if (!input.value.trim()) {
+          input.value = rawInput;
+        }
+        syncInputHeight();
+
+        const reason = error && error.message ? error.message : '网络或服务异常';
+        const isWrongEntry = window.location.protocol === 'file:' || window.location.pathname !== '/' || reason.includes('404');
+        const routeHint = isWrongEntry
+          ? '（检测到 POST /chat 返回 404：请确认已运行 python scripts/chat_server.py，并通过 http://127.0.0.1:8000/ 根路径访问，不要直接打开 web/chat.html 或使用静态文件服务）'
+          : '';
+        const errorText = `请求失败（${reason}）：无法完成本地模型推理${routeHint}，未发送的内容已保留在输入框中。`;
+        addMessage(errorText, 'error', '连接异常 · POST /chat', shouldScrollOnError);
+        showErrorBanner(errorText);
+        setWorkbenchStatus('error', '请求失败 · 请检查本地后端服务');
       } finally {
         setBusy(false);
-        input.focus();
+        input.focus({preventScroll: true});
       }
     }
+
+    input.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+
+    input.addEventListener('compositionend', () => {
+      isComposing = false;
+      lastCompositionEndTime = performance.now();
+    });
+
+    input.addEventListener('input', () => {
+      syncInputHeight();
+      updateSendState();
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+
+      const justEndedComposition = performance.now() - lastCompositionEndTime < 40;
+      if (isComposing || event.isComposing || event.keyCode === 229 || justEndedComposition) {
+        return;
+      }
+
+      event.preventDefault();
+      if (!isRequesting && input.value.trim()) {
+        sendMessage();
+      }
+    });
+
+    sendButton.addEventListener('click', () => {
+      sendMessage();
+    });
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       sendMessage();
     });
 
-    input.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        form.requestSubmit();
-      }
-    });
+    if (window.location.search === '?' && window.location.pathname === '/') {
+      window.history.replaceState(null, '', '/');
+    }
 
+    if (window.location.protocol === 'file:' || (window.location.pathname && window.location.pathname !== '/')) {
+      showErrorBanner(`当前访问地址为 ${window.location.href}，静态预览无法处理 POST /chat（会报 404）。请运行 python scripts/chat_server.py 并访问 http://127.0.0.1:8000/`);
+      setWorkbenchStatus('error', '入口提示 · 请访问 127.0.0.1:8000/');
+    }
+
+    syncInputHeight();
+    updateSendState();
     input.focus();
   </script>
 </body>

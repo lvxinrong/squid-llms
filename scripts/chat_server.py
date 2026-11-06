@@ -63,8 +63,8 @@ def main():
     global SESSION
     root = Path(__file__).resolve().parents[1]
     weights_path = root / "data/model_pth/qwen/qwen2_5-0_5b-instruct.safetensors"
-
-    model = load_qwen2_5(weights_path, device=get_device())
+    context_size = 4096
+    model = load_qwen2_5(weights_path, cfg={"context_length": context_size}, device=get_device(),)
     tokenizer = QwenTokenizerAdapter("Qwen/Qwen2.5-0.5B-Instruct")
 
     prompt_builder = partial(
@@ -75,8 +75,8 @@ def main():
     SESSION = ChatSession(
         model,
         tokenizer,
-        max_new_tokens=128,
-        context_size=1024,
+        max_new_tokens=512,
+        context_size=context_size,
         prompt_builder=prompt_builder,
     )
 
