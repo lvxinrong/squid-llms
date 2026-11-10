@@ -5,6 +5,7 @@ from squid.model.v2_rope.rope import (
     compute_cos_sin,
     apply_rope,
 )
+import torch.nn.functional as F
 
 
 class RMSNorm(nn.Module):
@@ -104,6 +105,8 @@ class GroupedQueryAttention(nn.Module):
             ),
             persistent=False,
         )
+        # 用于切换eager和SDPA的开关
+        self.attention_impl = cfg.get("attention_impl", "eager")
 
     def expand_kv(self, x):
         if self.num_queries_per_kv == 1:
@@ -164,25 +167,48 @@ class GroupedQueryAttention(nn.Module):
         keys = self.expand_kv(keys)
         values = self.expand_kv(values)
 
-        attn_scores = queries @ keys.transpose(-2, -1)
         q_len = queries.shape[2]
         k_len = keys.shape[2]
+        # 确保每个位置的计算都符合因果顺序，并让 prefill 产生的 cache 与后续逐 token decode 保持一致。
         if q_len == 1:
             mask_bool = None
         else:
             past_len = k_len - q_len
-            mask_bool = self.mask[past_len:past_len + q_len, :k_len]
+            mask_bool = self.mask[
+                past_len:past_len + q_len,
+                :k_len,
+            ]
 
-        if mask_bool is not None:
-            attn_scores = attn_scores.masked_fill(
-                mask_bool,
-                -torch.inf
+        if self.attention_impl == "sdpa":
+            # 我们的 mask 是“True 就屏蔽”，SDPA 的 bool mask 是“True 就允许”，所以传递前要用 ~ 做逐元素真假取反。
+            attn_mask = None if mask_bool is None else ~mask_bool
+
+            context_vec = F.scaled_dot_product_attention(
+                queries,
+                keys,
+                values,
+                attn_mask=attn_mask,
+                dropout_p=self.dropout.p if self.training else 0.0,
             )
+        elif self.attention_impl == "eager":
+            attn_scores = queries @ keys.transpose(-2, -1)
 
-        attn_weights = torch.softmax(attn_scores / self.head_dim ** 0.5, dim=-1)
-        attn_weights = self.dropout(attn_weights)
-        # (B, H, q_len, k_len) @ (B, H, k_len, D) -> (B, H, q_len, D)
-        context_vec = (attn_weights @ values).transpose(1, 2)
+            if mask_bool is not None:
+                attn_scores = attn_scores.masked_fill(
+                    mask_bool,
+                    -torch.inf,
+                )
+
+            attn_weights = torch.softmax(
+                attn_scores / self.head_dim ** 0.5,
+                dim=-1,
+            )
+            attn_weights = self.dropout(attn_weights)
+            context_vec = attn_weights @ values
+        else:
+            raise ValueError(f"未知 attention_impl: {self.attention_impl}")
+
+        context_vec = context_vec.transpose(1, 2)
         context_vec = context_vec.contiguous().view(
             b, num_tokens, self.n_heads * self.head_dim
         )
