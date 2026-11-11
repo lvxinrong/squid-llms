@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from squid.data.memmap_dataset import create_memmap_loader
-from squid.device import get_device
+from squid.device import get_device, memory_snapshot, reset_peak_memory_stats
 from squid.model.v3_modern.gpt import GPTModelV3
 from squid.train.common import calc_loss_batch
 
@@ -108,6 +108,8 @@ def main():
 
         if step == warmup_steps:
             synchronize(device)
+            reset_peak_memory_stats(device)
+            warmup_memory = memory_snapshot(device)
             start = time.perf_counter()
 
     synchronize(device)
@@ -132,6 +134,8 @@ def main():
         "elapsed_seconds": elapsed,
         "tokens_per_second": tokens_per_second,
         "losses": loss_values,
+        "memory_after_warmup": warmup_memory,
+        "memory_after_measured": measured_memory,
     }
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -141,7 +145,7 @@ def main():
     )
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print(f"\nFP32 基线报告已保存到：{REPORT_PATH}")
+    print(f"\nBF16 基线报告已保存到：{REPORT_PATH}")
 
 # 在当前 Mac/MPS、小型 model_v3、batch=2、context=128、10 步测量的条件下，BF16 没有带来性能收益。
 if __name__ == "__main__":

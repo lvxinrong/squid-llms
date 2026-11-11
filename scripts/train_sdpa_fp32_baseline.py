@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from squid.data.memmap_dataset import create_memmap_loader
-from squid.device import get_device
+from squid.device import get_device, memory_snapshot, reset_peak_memory_stats
 from squid.model.v3_modern.gpt import GPTModelV3
 from squid.train.common import calc_loss_batch
 
@@ -102,6 +102,8 @@ def main():
 
         if step == warmup_steps:
             synchronize(device)
+            reset_peak_memory_stats(device)
+            warmup_memory = memory_snapshot(device)
             start = time.perf_counter()
 
     synchronize(device)
@@ -127,6 +129,8 @@ def main():
         "tokens_per_second": tokens_per_second,
         "losses": loss_values,
         "attention_impl": "sdpa",
+        "memory_after_warmup": warmup_memory,
+        "memory_after_measured": measured_memory,
     }
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)

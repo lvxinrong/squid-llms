@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from squid.data.memmap_dataset import create_memmap_loader
-from squid.device import get_device
+from squid.device import get_device, memory_snapshot, reset_peak_memory_stats
 from squid.model.v3_modern.gpt import GPTModelV3
 from squid.train.common import calc_loss_batch
 
@@ -47,20 +47,6 @@ def synchronize(device):
         torch.mps.synchronize()
     elif device.type == "cuda":
         torch.cuda.synchronize()
-
-def memory_snapshot(device):
-    if device.type != "mps":
-        return {}
-
-    return {
-        "current_allocated_bytes": (
-            torch.mps.current_allocated_memory()
-        ),
-        "driver_allocated_bytes": (
-            torch.mps.driver_allocated_memory()
-        ),
-    }
-
 
 def main():
     torch.manual_seed(123)
@@ -117,6 +103,7 @@ def main():
 
         if step == warmup_steps:
             synchronize(device)
+            reset_peak_memory_stats(device)
             warmup_memory = memory_snapshot(device)
             start = time.perf_counter()
 
@@ -155,7 +142,7 @@ def main():
     )
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print(f"\nFP32 基线报告已保存到：{REPORT_PATH}")
+    print(f"\nCheckpointing + FP32 基线报告已保存到：{REPORT_PATH}")
 
 if __name__ == "__main__":
     main()
