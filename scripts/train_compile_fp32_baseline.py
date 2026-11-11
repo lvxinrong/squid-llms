@@ -108,6 +108,7 @@ def main():
             start = time.perf_counter()
 
     synchronize(device)
+    measured_memory = memory_snapshot(device)
     elapsed = time.perf_counter() - start
 
     loss_values = [loss.item() for loss in losses]
