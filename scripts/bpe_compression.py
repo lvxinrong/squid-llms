@@ -1,7 +1,8 @@
-"""
-1. 收语料：把 lv_blog/content/**/*.md 读出来拼成一份文本（留 2 篇做 held-out，不参与训练）
-2. 训练：train_bpe(train_text, 512)，保存 vocab/merges 中间产物
-3. 对比：同一段 held-out 文本，你的 BPE 和 TiktokenTokenizer("gpt2") 各 encode 一次，对比 token 数、bytes/token
+"""早期手写 BPE：从博客正文构造语料并训练、保存指定 merge 数量的词表。
+
+用途：理解语料收集、held-out 隔离、pair merge 与 vocab/merges 持久化的完整过程。
+输入：lv_blog 已发布 Markdown；train.txt、heldout 文本和 m512 等词表产物写入 data/blog/。
+边界：当前 main 默认训练并保存 BPE；prepare_corpus 与 GPT-2 压缩率对照代码被注释，执行前需按复盘目标显式启用。
 """
 import random
 import tomllib

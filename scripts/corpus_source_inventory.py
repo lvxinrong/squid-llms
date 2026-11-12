@@ -1,3 +1,10 @@
+"""I1 源文档盘点：在清洗前统计博客文章类型、正文规模、哈希与排除原因。
+
+用途：先知道哪些 Markdown 能进入语料，避免草稿、索引和特殊页面被无意用于训练。
+输入：lv_blog/content/**/*.md；完整清单写入 data/reports/i1-source-inventory.json。
+边界：这里统计原始正文而非清洗后文本，也不执行 tokenizer；同时提供 build_corpus 复用的读取与排除函数。
+"""
+
 import hashlib
 import json
 import tomllib

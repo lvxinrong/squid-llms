@@ -1,3 +1,10 @@
+"""M6 基础对话服务：加载 Qwen2.5-0.5B-Instruct，提供本地 Web 页面、健康检查和 /chat。
+
+用途：打通浏览器输入、HTTP 服务、ChatSession 与模型生成的最小应用链路。
+输入：本地 Qwen 权重和 tokenizer；服务监听 127.0.0.1:8000。
+边界：当前使用全局单会话与非流式 HTTP 响应，不代表 I3 的 SSE、多用户隔离或生产服务能力已经验收。
+"""
+
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path

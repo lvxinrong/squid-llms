@@ -4,21 +4,60 @@ from tqdm import tqdm
 from squid.data.instruct import format_input
 
 
-# idx.shape (B, T)
-#
-def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k = None, eos_id = None):
+def generate(
+        model, idx, max_new_tokens, context_size,
+        temperature = 0.0, top_k = None, eos_id = None,
+        past_kv = None, return_past_kv = False, position_offset=None,):
     idx_cond = idx[:, -context_size:]
+
+    model_kwargs = {
+        "past_kv": past_kv,
+        "use_cache": True,
+    }
+
+    if position_offset is not None:
+        model_kwargs["position_offset"] = position_offset
+
     with torch.no_grad():
-        logits, past_kv = model(idx_cond, use_cache=True)
-    # 最大可以生产的token，每次循环生成一个next
+        logits, past_kv = model(
+            idx_cond,
+            **model_kwargs,
+        )
+
+    if position_offset is not None:
+        position_offset += idx_cond.shape[1]
+
     for _ in range(max_new_tokens):
-        # 获取最新个context_size长度的token
-        idx_next = sample_next(logits[:, -1, :], temperature=temperature, top_k=top_k)
+        idx_next = sample_next(
+            logits[:, -1, :],
+            temperature=temperature,
+            top_k=top_k,
+        )
+
         idx = torch.cat([idx, idx_next], dim=1)
+
         if idx_next == eos_id:
             break
+
+        model_kwargs = {
+            "past_kv": past_kv,
+            "use_cache": True,
+        }
+        if position_offset is not None:
+            model_kwargs["position_offset"] = position_offset
+
         with torch.no_grad():
-            logits, past_kv = model(idx_next, past_kv=past_kv,use_cache=True)
+            logits, past_kv = model(
+                idx_next,
+                **model_kwargs,
+            )
+
+        if position_offset is not None:
+            position_offset += 1
+
+    if return_past_kv:
+        return idx, past_kv
+
     return idx
 
 def sample_next(logits, temperature=0.0, top_k=None):

@@ -48,20 +48,21 @@ class MultiHeadAttention(nn.Module):
         # 计算 attn_score  q @ key, 计算每个头的点积
         # (b, num_heads, num_tokens, head_dim) @ (b, num_heads, head_dim, num_tokens)
         attn_scores = queries @ keys.transpose(2, 3)
-        # attn_scores.shape = (b, num_heads, num_tokens, num_tokens)
-        # num_tokens, num_tokens 就是计算后的分数矩阵。 每一行就是token[i] 对于整个序列的注意力分数
+        # attn_scores.shape = (b, num_heads, q_len, k_len)
+        # 每一行对应本轮 query，每一列对应历史或本轮 key。
 
-
-        # 因果掩码，掩盖对角线右边的分数
-        # 加入kv之后，因果掩码是需要区分首轮(无cache) 用原来的因果掩码。 增量步(q_len = 1) 就可以看到全部历史，不用掩码了
-        # mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
-        #
-        # attn_scores.masked_fill_(mask_bool, -torch.inf)
+        # q_len=1 时可以看到全部已有 key；多 token 增量 prefill 需要按 past_len 偏移因果掩码。
         q_len = queries.shape[2]
+        k_len = keys.shape[2]
+
         if q_len == 1:
             mask_bool = None
         else:
-            mask_bool = self.mask.bool()[:q_len, :q_len]
+            past_len = k_len - q_len
+            mask_bool = self.mask.bool()[
+                past_len:past_len + q_len,
+                :k_len,
+            ]
 
         if mask_bool is not None:
             attn_scores.masked_fill_(mask_bool, -torch.inf)

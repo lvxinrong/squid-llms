@@ -1,3 +1,10 @@
+"""I1 早期语料 manifest：统计 train / heldout 文本的字符、字节、token、编码耗时和 SHA-256。
+
+用途：为早期数据版本提供可核对的规模与完整性信息，观察 Qwen tokenizer 编码成本。
+输入：data/blog/*.txt；报告写入 data/reports/i1-corpus-manifest.json。
+边界：这是早期 data/blog 文本管道，不是后续 data/corpus/blog_v1 的清洗与划分入口；复盘时不要混用两套数据版本。
+"""
+
 import hashlib
 import json
 import time

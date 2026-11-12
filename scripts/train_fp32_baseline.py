@@ -1,3 +1,11 @@
+"""I2 FP32 训练基线：测量固定小型 v3 在普通精度下的吞吐、loss 与设备内存。
+
+用途：为 AMP、SDPA、compile 和 checkpointing 提供同代码、同数据、同配置的参照。
+配置：2 层小模型，batch=2、context=128，2 步 warmup + 10 步测量，共 2560 个正式 tokens。
+输出：data/reports/i2-fp32-baseline.json。
+边界：CUDA 计时包含设备同步，MPS / CUDA 不支持的内存字段不虚构。
+"""
+
 import json
 import math
 import time

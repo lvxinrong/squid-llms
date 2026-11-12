@@ -1,3 +1,11 @@
+"""I2 FP16 / autocast 对照：测量半精度自动转换对训练吞吐、loss 和内存的影响。
+
+用途：与 FP32 / BF16 使用同一训练基线，比较不同 16-bit 浮点路径，而不是只比较权重存储。
+配置：2 层小模型，batch=2、context=128，2 步 warmup + 10 步正式测量。
+输出：data/reports/i2-fp16-baseline.json。
+边界：小模型吞吐结果不外推到大模型，后续 FP16 推理异常另有专项排查。
+"""
+
 import json
 import math
 import time

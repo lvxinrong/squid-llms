@@ -1,3 +1,10 @@
+"""I1 Dataset 内存对照：比较一次性 Python token 列表与 NumPy memmap 的构建成本。
+
+用途：用 tracemalloc、构建耗时和进程峰值 RSS 解释为什么大数据集不应全部物化到内存。
+用法：--mode legacy 或 --mode memmap；结果分别写入 data/reports/i1-dataset-memory-<mode>.json。
+边界：ru_maxrss 是进程历史峰值而非单个对象精确大小；两种模式应分开运行，避免同进程遗留分配污染对照。
+"""
+
 import argparse
 import json
 import resource

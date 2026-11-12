@@ -22,6 +22,8 @@ MODEL_V3_DEFAULT_CONFIG = {
 }
 
 class GPTModelV3(nn.Module):
+    supports_position_offset = True
+
     def __init__(self, cfg=None):
         super().__init__()
         cfg = {**MODEL_V3_DEFAULT_CONFIG, **(cfg or {})}
@@ -47,7 +49,7 @@ class GPTModelV3(nn.Module):
         )
 
 
-    def forward(self, x, past_kv=None, use_cache=False):
+    def forward(self, x, past_kv=None, use_cache=False, position_offset=None,):
         x = self.tok_emb(x)
         x = self.drop_emb(x)
         present = []
@@ -72,10 +74,11 @@ class GPTModelV3(nn.Module):
                     block,
                     x,
                     past,
+                    position_offset,
                     use_reentrant=False,
                 )
             else:
-                x, present_kv = block(x, past_kv=past)
+                x, present_kv = block(x, past_kv=past, position_offset = position_offset,)
             present.append(present_kv)
 
         x = self.final_norm(x)

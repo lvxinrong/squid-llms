@@ -1,3 +1,11 @@
+"""I2 Activation Checkpointing + FP32：测量训练时以重算换激活内存的真实取舍。
+
+用途：观察开启逐 block 激活重计算后，吞吐、loss 和显存相对 FP32 基线如何变化。
+配置：2 层小模型，batch=2、context=128，2 步 warmup + 10 步正式测量。
+输出：data/reports/i2-checkpointing-fp32-baseline.json。
+边界：小模型无显存瓶颈时的结论不能直接推广到接近 OOM 的大模型。
+"""
+
 import json
 import math
 import time

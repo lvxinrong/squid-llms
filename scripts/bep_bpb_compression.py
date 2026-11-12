@@ -1,3 +1,10 @@
+"""早期 BPE / BPB 实验的结构冒烟：加载指定 merge 词表并打印小型 GPT 参数量。
+
+用途：确认不同 merge 数量对应的 tokenizer 能驱动当前模型结构，为压缩率与训练实验做准备。
+输入：data/blog/m512 等词表目录；当前默认只检查 m512，结果打印到终端。
+边界：训练和 BPB 评估代码目前被注释；本脚本不会训练模型，也不能据此宣称已有 BPB 指标。
+"""
+
 from pathlib import Path
 from squid.device import get_device
 from squid.model.v1_gpt.gpt import GPTModel

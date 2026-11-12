@@ -1,3 +1,10 @@
+"""I1 语料构建：清洗博客 Markdown，固定 held-out，并生成 JSONL 与文档 manifest。
+
+用途：将文档排除规则、正文清洗、哈希去重和数据划分集中管理，防止训练 / 评估边界不一致。
+输入：lv_blog/content 的非草稿文章；输出 data/corpus/blog_v1/train.jsonl、heldout.jsonl、manifest.json。
+边界：当前只接收 article / profile，两篇 held-out 路径固定；新增文章或修改正文后重建会改变数据版本。
+"""
+
 import hashlib
 import json
 from pathlib import Path

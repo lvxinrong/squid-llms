@@ -1,3 +1,11 @@
+"""I2 SDPA + FP32 对照：将 v3 注意力入口切到 PyTorch scaled_dot_product_attention。
+
+用途：在保持 FP32 与其余训练配置不变时，测量统一 SDPA 入口对当前模型的实际影响。
+配置：batch=2、context=128，2 步 warmup + 10 步正式测量，并记录 loss 与设备内存。
+输出：data/reports/i2-sdpa-fp32-baseline.json。
+边界：调用 SDPA 不等于已确认 FlashAttention 后端，短序列结果不代表长序列收益。
+"""
+
 import json
 import math
 import time

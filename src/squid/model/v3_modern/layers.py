@@ -23,10 +23,14 @@ class RMSNorm(nn.Module):
     RMSNorm 主要通过等比例缩放控制幅度，LayerNorm 还会先做均值中心化。
     """
     def forward(self, x):
-        mean_square = x.pow(2).mean(dim=-1, keepdim=True)
-        y = x * torch.rsqrt(mean_square + self.eps) * self.scale
-        return y
+        input_dtype = x.dtype
 
+        x_float = x.float()
+        mean_square = x_float.pow(2).mean(dim = -1, keepdim = True)
+        y = x_float * torch.rsqrt(mean_square + self.eps) * self.scale.float()
+        return y.to(dtype=input_dtype)
+
+    
 class SwiGLUFFN(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -128,7 +132,7 @@ class GroupedQueryAttention(nn.Module):
     ...
     )
     """
-    def forward(self, x, past_kv=None):
+    def forward(self, x, past_kv=None, position_offset = None):
         b, num_tokens, _ = x.shape
         # (B, T, C) -> (B, T, H, D)
         queries = self.W_query(x).view(b, num_tokens, self.n_heads, self.head_dim)
@@ -148,9 +152,12 @@ class GroupedQueryAttention(nn.Module):
         if past_kv is not None:
             past_len = past_kv[0].shape[2]
 
+        if position_offset is None:
+            position_offset = past_len
+
         position_ids = torch.arange(
-            past_len,
-            past_len + num_tokens,
+            position_offset,
+            position_offset + num_tokens,
             device=x.device,
         )
 
@@ -223,11 +230,13 @@ class TransformerBlock(nn.Module):
         self.norm2 = RMSNorm(cfg)
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
-    def forward(self, x, past_kv=None):
+    def forward(self, x, past_kv=None, position_offset=None):
         shortcut = x
 
         x = self.norm1(x)
-        x, present_kv = self.att(x, past_kv)
+        x, present_kv = self.att(x,
+                                 past_kv = past_kv,
+                                 position_offset = position_offset,)
         x = self.drop_shortcut(x)
         x = x + shortcut
 

@@ -1,3 +1,10 @@
+"""I1 Scaling 预算：用约 20 tokens/参数的经验规则估算当前语料覆盖程度。
+
+用途：把 smoke 模型真实参数量、Qwen 0.5B 名义参数量和 train token 数放到同一数量级中理解。
+输入：regression/i1-memmap-smoke.pth 与 token store metadata；报告写入 data/reports/i1-scaling-budget.json。
+边界：20 tokens/参数只是从零预训练的近似参考；Qwen 使用 0.5B 名义值，不是实际权重精确统计，也不代表 SFT 数据需求。
+"""
+
 import json
 from pathlib import Path
 

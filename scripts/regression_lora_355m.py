@@ -1,8 +1,12 @@
-"""M0 回归：旧仓库 LoRA 权重（23.9 分基线）→ squid 加载 → 生成 → 打分。
+"""M0 回归：验证旧仓库 LoRA 权重迁移到 squid 后仍能生成并接受同口径评分。
+
+用途：及早发现模块重命名、LoRA 替换和 checkpoint 映射回归，并与旧仓库 23.9 分基线对照。
+输入：旧仓库 GPT-2 355M LoRA checkpoint 与指令测试集；生成和评分产物写入 regression/。
+边界：默认会调用 LLM 评委；--limit N --no-score 只做生成冒烟，不代表评分回归已通过。
 
 用法：
-    uv run python scripts/regression_lora_355m.py --limit 2 --no-score   # 冒烟
-    uv run python scripts/regression_lora_355m.py                        # 全量
+    uv run python scripts/regression_lora_355m.py --limit 2 --no-score
+    uv run python scripts/regression_lora_355m.py
 """
 import argparse
 import json

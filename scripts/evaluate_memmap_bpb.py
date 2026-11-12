@@ -1,3 +1,10 @@
+"""I1 BPB 评估：用 memmap held-out 数据衡量 smoke 模型的文本预测 / 压缩能力。
+
+用途：将交叉熵从 nats/token 换算为 bits/byte，使损失能与原始文本字节数关联。
+输入：regression/i1-memmap-smoke.pth 和 heldout.uint32.bin；输出 data/reports/i1-bpb-smoke.json。
+边界：累计所有 target 的 nats 后再平均，避免小批次等权误差；EOS 不计入自然文本字节，结果仅对应当前 checkpoint 与语料。
+"""
+
 import json
 import math
 from pathlib import Path

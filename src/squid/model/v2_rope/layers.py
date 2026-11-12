@@ -76,10 +76,17 @@ class RoPEMultiHeadAttention(nn.Module):
         attn_scores = queries @ keys.transpose(-2, -1)
 
         q_len = queries.shape[2]
+        k_len = keys.shape[2]
         if q_len == 1:
             mask_bool = None
         else:
-            mask_bool = self.mask.bool()[:q_len, :q_len]
+            past_len = k_len - q_len
+            mask_bool = self.mask.bool()[
+                past_len:past_len + q_len,
+                :k_len,
+            ]
+
+
         if mask_bool is not None:
             attn_scores.masked_fill_(mask_bool, -torch.inf)
 

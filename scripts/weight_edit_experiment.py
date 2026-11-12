@@ -1,3 +1,10 @@
+"""M5 受限权重编辑实验：验证 LLM 能否提出一个可审计的 EOS 行缩放补丁。
+
+用途：用 prepare / apply / evaluate 分离验证集观察、权重副本生成和测试集评分，避免直接污染原始模型。
+输入：SFT GPT-2 355M、指令数据划分、JSON patch 与基线评分；产物写入 data/weight_edit/。
+边界：evaluate 使用 LLM 评委且重跑可能波动；小幅均分变化不足以证明编辑有效，必须检查逐题回答与分布。
+"""
+
 import argparse
 import hashlib
 import json

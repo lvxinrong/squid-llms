@@ -1,3 +1,10 @@
+"""M4 指令微调：基于 GPT-2 355M 预训练权重完成 SFT 并保存对话模型。
+
+用途：复现从指令数据划分、DataLoader、SFT 训练到 checkpoint 的完整链路。
+输入：本地 GPT-2 355M 权重与 instruction-data.json；输出指令模型和 loss 曲线。
+边界：已有目标 checkpoint 时会跳过训练；当前使用脚本内的本地绝对路径，复盘前先确认数据与权重位置。
+"""
+
 import json
 from functools import partial
 from pathlib import Path

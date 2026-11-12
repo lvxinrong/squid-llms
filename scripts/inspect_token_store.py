@@ -1,3 +1,10 @@
+"""I1 token store 验收：用 memmap 只读检查 token 数、文件字节和首篇文档边界。
+
+用途：确认 metadata 中的 offset / length / EOS 能准确定位并解码原始文档，而不是只检查文件存在。
+输入：data/token_store/blog_v1/；输出终端打印首篇标题、位置和前 200 字符，不写报告。
+边界：这是结构完整性检查，不评估模型训练质量；依赖 metadata 指定的 Qwen tokenizer。
+"""
+
 import json
 from pathlib import Path
 

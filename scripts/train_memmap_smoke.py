@@ -1,3 +1,10 @@
+"""I1 memmap 训练冒烟：验证流式 token 数据能完成训练、保存、重载和一致前向。
+
+用途：用 5 个真实 optimizer step 检查数据管道与 checkpoint 闭环，而不是追求模型能力。
+输入：data/token_store/blog_v1/train.uint32.bin；checkpoint 写入 regression/i1-memmap-smoke.pth。
+边界：训练量极小；通过标准是 loss 有限、存档可重载且重载前后 logits 零误差，不代表模型已完成训练。
+"""
+
 from itertools import islice
 from pathlib import Path
 

@@ -1,3 +1,10 @@
+"""I2 环境探针：验证当前设备是否支持 FP16 / BF16、autocast、SDPA 与 torch.compile。
+
+用途：在正式训练加速实验前区分环境能力与性能结果，尽早暴露编译器、依赖或设备缺口。
+输出：data/reports/i2-environment.json，包含平台、PyTorch 版本和各探针真实结果 / 错误。
+边界：SDPA 可用不等于使用 FlashAttention；compile 探针成功不代表模型训练一定提速，也不产生性能基线。
+"""
+
 import json
 import platform
 from pathlib import Path

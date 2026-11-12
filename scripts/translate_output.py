@@ -1,4 +1,9 @@
-"""用 DeepSeek API 把模型生成的英文翻译成中文（朋友圈截图用）。"""
+"""用 DeepSeek API 将脚本内置的英文模型输出生成自然中文，用于分享与展示。
+
+用途：把翻译调用与模型训练解耦，单独检查英文文本的中文表达效果。
+输入：脚本中的 EN_TEXT 和环境变量 DEEPSEEK_API_KEY；结果直接打印到终端。
+边界：这是外部 API 翻译，不是本地 Squid 模型的翻译能力验收，也不产出可复现的本地报告。
+"""
 import os
 
 from openai import OpenAI

@@ -1,3 +1,11 @@
+"""I2 BF16 / autocast 对照：测量低精度自动转换对训练吞吐和内存的影响。
+
+用途：在与 FP32 相同的小型模型和数据配置下，隔离 BF16 autocast 这一项变量。
+配置：batch=2、context=128，2 步 warmup + 10 步正式测量，loss 需保持有限。
+输出：data/reports/i2-bf16-baseline.json。
+边界：结果只代表当前设备和小模型，峰值分配与预留需分别解释。
+"""
+
 import json
 import math
 import time

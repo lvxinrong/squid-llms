@@ -15,19 +15,35 @@ def reset_peak_memory_stats(device):
         torch.cuda.reset_peak_memory_stats()
 
 
+def bytes_to_mb(value):
+    return round(value / 1_000_000, 2)
+
+
 def memory_snapshot(device):
     if device.type == "mps":
+        current = torch.mps.current_allocated_memory()
+        driver = torch.mps.driver_allocated_memory()
         return {
-            "current_allocated_bytes": torch.mps.current_allocated_memory(),
-            "driver_allocated_bytes": torch.mps.driver_allocated_memory(),
+            "current_allocated_bytes": current,
+            "current_allocated_mb": bytes_to_mb(current),
+            "driver_allocated_bytes": driver,
+            "driver_allocated_mb": bytes_to_mb(driver),
         }
 
     if device.type == "cuda":
+        current = torch.cuda.memory_allocated()
+        peak = torch.cuda.max_memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        peak_reserved = torch.cuda.max_memory_reserved()
         return {
-            "current_allocated_bytes": torch.cuda.memory_allocated(),
-            "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
-            "current_reserved_bytes": torch.cuda.memory_reserved(),
-            "peak_reserved_bytes": torch.cuda.max_memory_reserved(),
+            "current_allocated_bytes": current,
+            "current_allocated_mb": bytes_to_mb(current),
+            "peak_allocated_bytes": peak,
+            "peak_allocated_mb": bytes_to_mb(peak),
+            "current_reserved_bytes": reserved,
+            "current_reserved_mb": bytes_to_mb(reserved),
+            "peak_reserved_bytes": peak_reserved,
+            "peak_reserved_mb": bytes_to_mb(peak_reserved),
         }
 
     return {}

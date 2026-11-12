@@ -1,3 +1,10 @@
+"""I1 旧数据管道基线：一次性读取、编码全部语料并构建 Python token 窗口列表。
+
+用途：记录 legacy TokenStreamDataset 的耗时与内存，为后续 memmap 对照提供参照。
+输入：data/blog/train.txt 和 Qwen tokenizer；报告写入 data/reports/i1-loader-baseline.json。
+边界：tracemalloc 与 ru_maxrss 口径不同；本脚本测量数据准备，不测量模型训练吞吐或效果。
+"""
+
 import json
 import resource
 import time

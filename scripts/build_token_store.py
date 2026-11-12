@@ -1,3 +1,10 @@
+"""I1 构建 token store：将清洗后的 JSONL 语料编码为可 memmap 读取的 uint32 二进制流。
+
+用途：把 tokenizer、EOS、文档 offset / length、哈希和字节数固化为可审计的数据契约，供训练与评估复用。
+输入：data/corpus/blog_v1/train.jsonl 与 heldout.jsonl；输出 train / heldout .bin 和 metadata.json。
+边界：使用 Qwen/Qwen2.5-0.5B tokenizer；重建会覆盖同名输出，复盘时先确认语料 manifest 与现有数据版本。
+"""
+
 import hashlib
 import json
 import numpy as np

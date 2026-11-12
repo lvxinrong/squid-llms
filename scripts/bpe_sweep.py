@@ -1,3 +1,10 @@
+"""手写 BPE merge 数量扫描：观察压缩收益如何随词表训练规模变化。
+
+用途：在多个 merge 检查点重复编码同一 held-out 文本，记录 token 数与 UTF-8 bytes/token。
+输入：data/held/train.txt 和固定 held-out 文本；结果打印到终端，不写 JSON 报告。
+边界：这是分词压缩实验，不是模型训练质量评估；路径与检查点目前直接在脚本中配置。
+"""
+
 from squid.tokenizer import count_pairs, merge, encode
 
 

@@ -1,3 +1,11 @@
+"""I2 compile + FP32 对照：测量 torch.compile 后模型训练的稳态吞吐和内存。
+
+用途：隔离执行图编译优化这一项变量，与 eager FP32 基线使用相同模型、数据和测量步数。
+配置：2 步 warmup + 10 步正式测量；首次图捕获和编译成本不计入稳态 tokens/s。
+输出：data/reports/i2-compile-fp32-baseline.json。
+边界：不把稳态提升直接换算成完整任务总耗时收益。
+"""
+
 import json
 import math
 import time
