@@ -224,3 +224,38 @@ def test_v3_sliding_cache_preserves_position_progress():
     assert session.history == [("two", "AAA"), ("three", "AAA")]
     assert session.cached_token_ids == expected_prompt_ids + [0, 0, 0]
     assert session.next_position == old_next_position + input_length + 3
+
+
+def test_ask_stream_matches_ask_and_preserves_state():
+    synchronous = build_session(context_size=512)
+    streaming = build_session(context_size=512)
+
+    expected = synchronous.ask("one")
+    deltas = list(streaming.ask_stream("one"))
+
+    assert "".join(deltas) == expected
+    assert streaming.history == synchronous.history
+    assert streaming.cached_token_ids == synchronous.cached_token_ids
+    assert streaming.next_position == synchronous.next_position
+
+    for stream_layer, sync_layer in zip(
+        streaming.past_kv,
+        synchronous.past_kv,
+    ):
+        for stream_tensor, sync_tensor in zip(stream_layer, sync_layer):
+            assert torch.equal(stream_tensor, sync_tensor)
+
+
+def test_incomplete_stream_invalidates_cache_and_can_recover():
+    session = build_session(context_size=512)
+    stream = session.ask_stream("one")
+
+    assert next(stream) == "A"
+    stream.close()
+
+    assert session.history == []
+    assert session.past_kv is None
+    assert session.cached_token_ids == []
+    assert session.next_position == 0
+
+    assert session.ask("one") == "AAA"

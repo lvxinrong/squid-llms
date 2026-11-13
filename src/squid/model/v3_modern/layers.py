@@ -24,7 +24,6 @@ class RMSNorm(nn.Module):
     """
     def forward(self, x):
         input_dtype = x.dtype
-
         x_float = x.float()
         mean_square = x_float.pow(2).mean(dim = -1, keepdim = True)
         y = x_float * torch.rsqrt(mean_square + self.eps) * self.scale.float()

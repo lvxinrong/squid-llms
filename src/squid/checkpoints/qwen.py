@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from safetensors.torch import load_file
-
 from squid.device import get_device
 from squid.model.v3_modern.gpt import GPTModelV3
+import json
 
 
 def map_qwen_state_dict(state_dict):
@@ -68,3 +68,50 @@ def load_qwen2_5(weights_path, cfg=None, device=None):
     model.to(device or get_device())
     model.eval()
     return model
+
+def load_qwen2_5_dir(
+    model_dir,
+    context_size=4096,
+    device=None,
+):
+    model_dir = Path(model_dir)
+    config = json.loads(
+        (model_dir / "config.json").read_text(
+            encoding="utf-8",
+        )
+    )
+
+    if config.get("model_type") != "qwen2":
+        raise ValueError("当前入口只支持 Qwen2 / Qwen2.5 Dense")
+
+    if config.get("hidden_act") != "silu":
+        raise ValueError("当前实现要求 hidden_act=silu")
+
+    if config.get("use_sliding_window", False):
+        raise NotImplementedError("当前入口不支持 sliding attention")
+
+    cfg = {
+        "vocab_size": config["vocab_size"],
+        "emb_dim": config["hidden_size"],
+        "ffn_dim": config["intermediate_size"],
+        "n_heads": config["num_attention_heads"],
+        "n_kv_heads": config["num_key_value_heads"],
+        "n_layers": config["num_hidden_layers"],
+        "rope_theta": config.get("rope_theta", 10000.0),
+        "eps": config.get("rms_norm_eps", 1e-6),
+        "qkv_bias": config.get("attention_bias", True),
+        "drop_rate": config.get("attention_dropout", 0.0),
+        "context_length": context_size,
+        "ffn_bias": False,
+        "tie_word_embeddings": config.get(
+            "tie_word_embeddings",
+            False,
+        ),
+    }
+
+    return load_qwen2_5(
+        model_dir / "model.safetensors",
+        cfg=cfg,
+        device=device,
+    )
+

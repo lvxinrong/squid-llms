@@ -1,5 +1,5 @@
 import torch
-from squid.generate.engine import generate
+from squid.generate.engine import generate_stream
 
 
 class ChatSession:
@@ -23,7 +23,7 @@ class ChatSession:
         self.cached_token_ids = []
         self.next_position = 0
 
-    def ask(self, user_input):
+    def _prepare_input(self, user_input):
         prompt_ids = self._prompt_ids_within_budget(user_input)
 
         if self._cache_matches(prompt_ids):
@@ -60,35 +60,33 @@ class ChatSession:
             else None
         )
 
-        device = next(self.model.parameters()).device
-        idx = torch.tensor(
-            [input_ids],
-            device=device,
-            dtype=torch.long,
-        )
+        return {
+            "prompt_ids": prompt_ids,
+            "input_ids": input_ids,
+            "past_kv": past_kv,
+            "previous_cache_length": previous_cache_length,
+            "position_offset": position_offset,
+        }
 
-        output, present_kv = generate(
-            self.model,
-            idx,
-            max_new_tokens=self.max_new_tokens,
-            context_size=self.context_size,
-            eos_id=self.tokenizer.eos_id,
-            past_kv=past_kv,
-            return_past_kv=True,
-            position_offset=position_offset,
-        )
-
-        generated_ids = output[0, len(input_ids):].tolist()
+    def _clean_response(self, generated_ids):
         response = self.tokenizer.decode(generated_ids)
-
         for marker in (
-                "<|endoftext|>",
-                "<|im_end|>",
-                "### Instruction:",
+            "<|endoftext|>",
+            "<|im_end|>",
+            "### Instruction:",
         ):
             response = response.split(marker, 1)[0]
+        return response.strip()
 
-        response = response.strip()
+    def _finalize_response(
+        self,
+        user_input,
+        prompt_ids,
+        generated_ids,
+        present_kv,
+        previous_cache_length,
+    ):
+        response = self._clean_response(generated_ids)
         self.history.append((user_input, response))
         self.history = self.history[-self.max_history_turns:]
 
@@ -100,8 +98,64 @@ class ChatSession:
 
         processed_tokens = cache_length - previous_cache_length
         self.next_position += processed_tokens
-
         return response
+
+    def ask(self, user_input):
+        return "".join(self.ask_stream(user_input))
+
+    def ask_stream(self, user_input):
+        prepared = self._prepare_input(user_input)
+        input_ids = prepared["input_ids"]
+        device = next(self.model.parameters()).device
+        idx = torch.tensor(
+            [input_ids],
+            device=device,
+            dtype=torch.long,
+        )
+
+        generated_ids = []
+        previous_response = ""
+        completed = False
+
+        try:
+            stream = generate_stream(
+                self.model,
+                idx,
+                max_new_tokens=self.max_new_tokens,
+                context_size=self.context_size,
+                eos_id=self.tokenizer.eos_id,
+                past_kv=prepared["past_kv"],
+                position_offset=prepared["position_offset"],
+            )
+
+            while True:
+                try:
+                    next_id = next(stream)
+                except StopIteration as stop:
+                    present_kv = stop.value[1]
+                    break
+
+                generated_ids.append(next_id.item())
+                response = self._clean_response(generated_ids)
+                delta = response[len(previous_response):]
+
+                if delta:
+                    yield delta
+                    previous_response = response
+
+            self._finalize_response(
+                user_input=user_input,
+                prompt_ids=prepared["prompt_ids"],
+                generated_ids=generated_ids,
+                present_kv=present_kv,
+                previous_cache_length=prepared["previous_cache_length"],
+            )
+            completed = True
+        finally:
+            if not completed:
+                self.past_kv = None
+                self.cached_token_ids = []
+                self.next_position = 0
 
     def clear(self):
         self.history = []

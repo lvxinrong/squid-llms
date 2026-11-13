@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>lvchat · 本地模型单会话实验台</title>
+  <title>lvchat · 本地模型流式实验台</title>
   <style>
     :root {
       color-scheme: light;
@@ -157,6 +157,38 @@
       font-size: 12.5px;
       line-height: 1.4;
       font-family: var(--font-mono);
+    }
+
+    .session-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .session-select {
+      min-width: 170px;
+      max-width: 260px;
+      height: 36px;
+      padding: 0 30px 0 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      color: var(--text-secondary);
+      background: var(--surface);
+      font-family: var(--font-sans);
+      font-size: 12px;
+    }
+
+    .session-select:disabled {
+      opacity: 0.55;
+    }
+
+    .new-session-button {
+      min-width: 92px;
+      height: 36px;
+      padding: 0 12px;
+      font-size: 12px;
+      box-shadow: none;
     }
 
     .telemetry-bar {
@@ -875,10 +907,15 @@
           </div>
         </div>
 
+        <div class="session-controls" aria-label="会话管理">
+          <select id="session-select" class="session-select" aria-label="切换会话"></select>
+          <button id="new-session" class="new-session-button" type="button">新建会话</button>
+        </div>
+
         <div class="telemetry-bar" aria-label="实验台运行状态">
           <span class="pill pill-mono">
             <span class="pill-label">SESSION</span>
-            <span class="pill-strong">Single · 连续上下文</span>
+            <span id="current-session" class="pill-strong">新会话</span>
           </span>
           <span class="pill pill-mono">
             <span class="pill-label">TURNS</span>
@@ -904,9 +941,9 @@
             <div class="pipeline-title">LOCAL INFERENCE PIPELINE</div>
             <div class="pipeline-steps">
               <div class="pipeline-step"><span class="step-index">1</span><span>输入实验 Prompt</span></div>
-              <div class="pipeline-step"><span class="step-index">2</span><span>POST /chat 同步请求</span></div>
-              <div class="pipeline-step"><span class="step-index">3</span><span>model_v3 本地单线程生成</span></div>
-              <div class="pipeline-step"><span class="step-index">4</span><span>完整回答一次性返回</span></div>
+              <div class="pipeline-step"><span class="step-index">2</span><span>POST /chat/stream · SSE 请求</span></div>
+              <div class="pipeline-step"><span class="step-index">3</span><span>model_v3 本地逐 token 生成</span></div>
+              <div class="pipeline-step"><span class="step-index">4</span><span>SSE 事件逐段推送</span></div>
             </div>
           </div>
         </div>
@@ -920,9 +957,9 @@
           </div>
           <div class="spec-card">
             <span class="spec-index">02 / SESSION MODE</span>
-            <span class="spec-title">单会话连续实验</span>
-            <span class="spec-code">Single Session · Stateful</span>
-            <p class="spec-desc">当前服务端维护单一连续会话上下文，适合多轮追问与指令跟随测试。</p>
+            <span class="spec-title">多会话隔离实验</span>
+            <span class="spec-code">Multi Session · Stateful</span>
+            <p class="spec-desc">按 session_id 维护独立 history、KV Cache 和位置进度，适合隔离与多轮追问测试。</p>
           </div>
           <div class="spec-card">
             <span class="spec-index">03 / OUTPUT BOUNDARY</span>
@@ -947,8 +984,8 @@
           <button id="send" type="button">发送</button>
         </form>
         <div class="footer-meta">
-          <p class="hint">当前为单会话实验 · 非流式同步返回 · 模型能力有限，请把回答当作实验结果</p>
-          <span class="kbd-hint">Enter 发送 · Shift+Enter 换行 · POST /chat</span>
+          <p class="hint">当前为 SSE 流式 · 多会话隔离实验 · 模型能力有限，请把回答当作实验结果</p>
+          <span class="kbd-hint">Enter 发送 · Shift+Enter 换行 · POST /chat/stream</span>
         </div>
       </div>
     </div>
@@ -964,11 +1001,33 @@
     const statusText = document.getElementById('status-text');
     const turnCounter = document.getElementById('turn-counter');
     const errorBanner = document.getElementById('error-banner');
+    const sessionSelect = document.getElementById('session-select');
+    const newSessionButton = document.getElementById('new-session');
+    const currentSessionLabel = document.getElementById('current-session');
 
     let isRequesting = false;
     let isComposing = false;
     let lastCompositionEndTime = 0;
     let turnCount = 0;
+
+    const SESSION_STORAGE_KEY = 'lvchat.sessionId';
+
+    function createSessionId() {
+      return window.crypto && typeof window.crypto.randomUUID === 'function'
+        ? window.crypto.randomUUID()
+        : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    let sessionId;
+    try {
+      sessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      if (!sessionId) {
+        sessionId = createSessionId();
+        window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+      }
+    } catch {
+      sessionId = createSessionId();
+    }
 
     const MAX_INPUT_HEIGHT = 180;
     const MIN_INPUT_HEIGHT = 44;
@@ -995,6 +1054,8 @@
     function updateSendState() {
       const hasContent = input.value.trim().length > 0;
       sendButton.disabled = isRequesting || !hasContent;
+      sessionSelect.disabled = isRequesting;
+      newSessionButton.disabled = isRequesting;
       sendButton.setAttribute('aria-busy', isRequesting ? 'true' : 'false');
       sendButton.textContent = isRequesting ? '生成中…' : '发送';
     }
@@ -1327,7 +1388,7 @@
       dot.setAttribute('aria-hidden', 'true');
 
       const label = document.createElement('span');
-      label.textContent = '正在等待本地模型生成完整回答…';
+      label.textContent = '正在等待本地模型的首个流式事件…';
 
       bubble.appendChild(dot);
       bubble.appendChild(label);
@@ -1346,6 +1407,143 @@
       if (busy) {
         setWorkbenchStatus('busy', '正在等待本地模型生成…');
       }
+    }
+
+    function handleSseFrame(frame, onEvent) {
+      const data = frame
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trimStart())
+        .join('\n');
+
+      if (data) {
+        onEvent(JSON.parse(data));
+      }
+    }
+
+    async function readSseStream(response, onEvent) {
+      if (!response.body) {
+        throw new Error('当前浏览器没有可用的流式响应体');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, {stream: true});
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop();
+        frames.forEach((frame) => handleSseFrame(frame, onEvent));
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        handleSseFrame(buffer, onEvent);
+      }
+    }
+
+    function updateSessionLabel() {
+      currentSessionLabel.textContent = sessionId.slice(0, 8);
+      currentSessionLabel.title = sessionId;
+    }
+
+    async function refreshSessionList() {
+      const response = await fetch('/sessions');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+      if (!sessions.some((session) => session.session_id === sessionId)) {
+        sessions.push({
+          session_id: sessionId,
+          title: '新会话',
+          turns: turnCount,
+        });
+      }
+
+      sessionSelect.replaceChildren();
+      sessions.forEach((session) => {
+        const option = document.createElement('option');
+        const title = session.title || '新会话';
+        option.value = session.session_id;
+        option.textContent = `${title.slice(0, 18)} · ${session.turns}轮`;
+        sessionSelect.appendChild(option);
+      });
+      sessionSelect.value = sessionId;
+      updateSessionLabel();
+    }
+
+    async function loadSessionHistory(targetId) {
+      const response = await fetch(
+        `/session/history?session_id=${encodeURIComponent(targetId)}`,
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const history = Array.isArray(data.history) ? data.history : [];
+
+      chat.querySelectorAll('.message').forEach((row) => row.remove());
+
+      if (history.length === 0) {
+        if (welcome && !welcome.parentNode) chat.appendChild(welcome);
+        turnCount = 0;
+      } else {
+        if (welcome && welcome.parentNode) welcome.remove();
+        history.forEach((turn, index) => {
+          const label = `#${String(index + 1).padStart(2, '0')}`;
+          addMessage(turn.user, 'user', `你 · TURN ${label}`, false);
+          addMessage(
+            turn.assistant || '（模型返回了空内容）',
+            'assistant',
+            `model_v3 · TURN ${label}`,
+            false,
+          );
+        });
+        turnCount = history.length;
+      }
+
+      turnCounter.textContent = String(turnCount).padStart(2, '0');
+      updateSessionLabel();
+      showErrorBanner('');
+      scrollToBottom(true);
+    }
+
+    async function switchSession(targetId) {
+      if (isRequesting || targetId === sessionId) return;
+
+      sessionId = targetId;
+      try {
+        window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+      } catch {
+        // 无本地存储时仍可在当前页面切换。
+      }
+
+      input.value = '';
+      syncInputHeight();
+      await loadSessionHistory(sessionId);
+      await refreshSessionList();
+      setWorkbenchStatus('ok', '就绪 · 已切换会话');
+    }
+
+    async function startNewSession() {
+      if (isRequesting) return;
+
+      sessionId = createSessionId();
+      try {
+        window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+      } catch {
+        // 无本地存储时仍可创建当前页面的新会话。
+      }
+
+      input.value = '';
+      syncInputHeight();
+      await loadSessionHistory(sessionId);
+      await refreshSessionList();
+      setWorkbenchStatus('ok', '新会话 · 等待输入');
+      input.focus({preventScroll: true});
     }
 
     async function sendMessage() {
@@ -1373,26 +1571,53 @@
       setBusy(true);
 
       const pendingRow = addPendingRow(wasNearBottomOnSend);
+      const pendingBubble = pendingRow.querySelector('.bubble');
+      const pendingMeta = pendingRow.querySelector('.msg-meta');
+      let assistantText = '';
+      let completed = false;
 
       try {
-        const response = await fetch('/chat', {
+        const response = await fetch('/chat/stream', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({message}),
+          body: JSON.stringify({message, session_id: sessionId}),
         });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        const data = await response.json();
+
+        await readSseStream(response, (event) => {
+          if (event.session_id !== sessionId) {
+            throw new Error('收到了其他会话的流式事件');
+          }
+          if (event.error) {
+            throw new Error(event.error);
+          }
+          if (event.delta) {
+            assistantText += event.delta;
+            pendingRow.classList.remove('pending');
+            pendingMeta.textContent = 'model_v3 · 正在流式生成';
+            pendingBubble.textContent = assistantText;
+            setWorkbenchStatus('busy', '正在接收 SSE 事件…');
+            scrollToBottom(isNearBottom());
+          }
+          if (event.done) {
+            completed = true;
+          }
+        });
+
+        if (!completed) {
+          throw new Error('流式响应未正常结束');
+        }
+
         const shouldScrollOnReply = isNearBottom();
         pendingRow.remove();
         turnCount = nextTurn;
         turnCounter.textContent = String(turnCount).padStart(2, '0');
-        const reply = typeof data.response === 'string' && data.response.length > 0
-          ? data.response
-          : '（模型返回了空内容）';
+        const reply = assistantText || '（模型返回了空内容）';
         addMessage(reply, 'assistant', `model_v3 · Qwen2.5-0.5B · TURN ${turnLabel}`, shouldScrollOnReply);
-        setWorkbenchStatus('ok', '就绪 · 同步返回');
+        setWorkbenchStatus('ok', '就绪 · SSE 流式返回');
+        refreshSessionList().catch(() => {});
       } catch (error) {
         const shouldScrollOnError = isNearBottom();
         pendingRow.remove();
@@ -1406,10 +1631,10 @@
         const reason = error && error.message ? error.message : '网络或服务异常';
         const isWrongEntry = window.location.protocol === 'file:' || window.location.pathname !== '/' || reason.includes('404');
         const routeHint = isWrongEntry
-          ? '（检测到 POST /chat 返回 404：请确认已运行 python scripts/chat_server.py，并通过 http://127.0.0.1:8000/ 根路径访问，不要直接打开 web/chat.html 或使用静态文件服务）'
+          ? '（检测到 POST /chat/stream 返回 404：请确认已运行 python scripts/chat_server.py，并通过 http://127.0.0.1:8000/ 根路径访问，不要直接打开 web/chat.html 或使用静态文件服务）'
           : '';
         const errorText = `请求失败（${reason}）：无法完成本地模型推理${routeHint}，未发送的内容已保留在输入框中。`;
-        addMessage(errorText, 'error', '连接异常 · POST /chat', shouldScrollOnError);
+        addMessage(errorText, 'error', '连接异常 · POST /chat/stream', shouldScrollOnError);
         showErrorBanner(errorText);
         setWorkbenchStatus('error', '请求失败 · 请检查本地后端服务');
       } finally {
@@ -1455,14 +1680,26 @@
       sendMessage();
     });
 
+    newSessionButton.addEventListener('click', () => {
+      startNewSession().catch(() => {});
+    });
+
+    sessionSelect.addEventListener('change', () => {
+      switchSession(sessionSelect.value).catch(() => {});
+    });
+
     if (window.location.search === '?' && window.location.pathname === '/') {
       window.history.replaceState(null, '', '/');
     }
 
     if (window.location.protocol === 'file:' || (window.location.pathname && window.location.pathname !== '/')) {
-      showErrorBanner(`当前访问地址为 ${window.location.href}，静态预览无法处理 POST /chat（会报 404）。请运行 python scripts/chat_server.py 并访问 http://127.0.0.1:8000/`);
+      showErrorBanner(`当前访问地址为 ${window.location.href}，静态预览无法处理 POST /chat/stream（会报 404）。请运行 python scripts/chat_server.py 并访问 http://127.0.0.1:8000/`);
       setWorkbenchStatus('error', '入口提示 · 请访问 127.0.0.1:8000/');
     }
+
+    updateSessionLabel();
+    refreshSessionList().catch(() => {});
+    loadSessionHistory(sessionId).catch(() => {});
 
     syncInputHeight();
     updateSendState();
