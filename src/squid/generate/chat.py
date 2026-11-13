@@ -137,11 +137,30 @@ class ChatSession:
 
                 generated_ids.append(next_id.item())
                 response = self._clean_response(generated_ids)
-                delta = response[len(previous_response):]
+                if response.endswith("\ufffd"):
+                    continue
 
+                delta = response[len(previous_response):]
                 if delta:
                     yield delta
                     previous_response = response
+
+            self.last_generated_tokens = len(generated_ids)
+            stopped_by_eos = (
+                generated_ids
+                and self.tokenizer.eos_id is not None
+                and generated_ids[-1] == self.tokenizer.eos_id
+            )
+            self.last_finish_reason = (
+                "stop"
+                if stopped_by_eos or len(generated_ids) < self.max_new_tokens
+                else "length"
+            )
+
+            response = self._clean_response(generated_ids)
+            delta = response[len(previous_response):]
+            if delta:
+                yield delta
 
             self._finalize_response(
                 user_input=user_input,
@@ -289,7 +308,12 @@ def build_chat_prompt(history, current_input):
     return "\n\n".join(parts)
 
 
-def build_qwen_chat_prompt(hf_tokenizer, history, current_input):
+def build_qwen_chat_prompt(
+    hf_tokenizer,
+    history,
+    current_input,
+    enable_thinking=None,
+):
     messages = [
         {
             "role": "system",
@@ -312,8 +336,14 @@ def build_qwen_chat_prompt(hf_tokenizer, history, current_input):
         "content": current_input,
     })
 
+    template_kwargs = {
+        "tokenize": False,
+        "add_generation_prompt": True,
+    }
+    if enable_thinking is not None:
+        template_kwargs["enable_thinking"] = enable_thinking
+
     return hf_tokenizer.apply_chat_template(
         messages,
-        tokenize=False,
-        add_generation_prompt=True,
+        **template_kwargs,
     )

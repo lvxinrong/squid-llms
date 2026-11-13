@@ -523,6 +523,47 @@
       margin-bottom: 0;
     }
 
+    .thinking-details {
+      margin: 0 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-subtle);
+      overflow: hidden;
+    }
+
+    .thinking-summary {
+      padding: 9px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .thinking-body {
+      padding: 0 12px 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .thinking-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .thinking-toggle input {
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
     .md-p {
       margin: 0 0 12px;
       white-space: pre-wrap;
@@ -903,7 +944,7 @@
               <h1>lvchat</h1>
               <span class="brand-badge">LOCAL LLM WORKBENCH</span>
             </div>
-            <div class="model">model_v3 · Qwen2.5-0.5B Instruct · 本地推理</div>
+            <div class="model">model_v4 · Qwen3-0.6B · 本地推理</div>
           </div>
         </div>
 
@@ -933,16 +974,16 @@
       <div id="welcome" class="welcome">
         <div class="welcome-top">
           <div class="welcome-copy">
-            <span class="welcome-eyebrow">EXP // MODEL_V3 × QWEN2.5-0.5B</span>
+            <span class="welcome-eyebrow">EXP // MODEL_V4 × QWEN3-0.6B</span>
             <h2>和自己的模型聊一句</h2>
-            <p>这是从零手搓模型、承接权重、训练评估到本地对话界面的最小闭环。<br>模型体量只有 0.5B，回答未必完美，但每一次推理都在你的本地机器上真实发生。</p>
+            <p>这是从零手搓模型、承接权重、训练评估到本地对话界面的最小闭环。<br>当前使用 Qwen3-0.6B 后训练对话模型，支持思考模式；回答未必完美，但每一次推理都在你的本地机器上真实发生。</p>
           </div>
           <div class="pipeline-box" aria-label="本地推理链路">
             <div class="pipeline-title">LOCAL INFERENCE PIPELINE</div>
             <div class="pipeline-steps">
               <div class="pipeline-step"><span class="step-index">1</span><span>输入实验 Prompt</span></div>
               <div class="pipeline-step"><span class="step-index">2</span><span>POST /chat/stream · SSE 请求</span></div>
-              <div class="pipeline-step"><span class="step-index">3</span><span>model_v3 本地逐 token 生成</span></div>
+              <div class="pipeline-step"><span class="step-index">3</span><span>model_v4 本地逐 token 生成</span></div>
               <div class="pipeline-step"><span class="step-index">4</span><span>SSE 事件逐段推送</span></div>
             </div>
           </div>
@@ -952,7 +993,7 @@
           <div class="spec-card">
             <span class="spec-index">01 / ARCHITECTURE</span>
             <span class="spec-title">手搓架构与权重承接</span>
-            <span class="spec-code">model_v3 + Qwen2.5-0.5B Instruct</span>
+            <span class="spec-code">model_v4 + Qwen3-0.6B · Thinking</span>
             <p class="spec-desc">本地直接加载模型权重完成前向推理，不依赖外部云端大模型 API。</p>
           </div>
           <div class="spec-card">
@@ -985,6 +1026,10 @@
         </form>
         <div class="footer-meta">
           <p class="hint">当前为 SSE 流式 · 多会话隔离实验 · 模型能力有限，请把回答当作实验结果</p>
+          <label class="thinking-toggle" for="enable-thinking">
+            <input id="enable-thinking" type="checkbox" checked>
+            思考模式
+          </label>
           <span class="kbd-hint">Enter 发送 · Shift+Enter 换行 · POST /chat/stream</span>
         </div>
       </div>
@@ -1004,6 +1049,7 @@
     const sessionSelect = document.getElementById('session-select');
     const newSessionButton = document.getElementById('new-session');
     const currentSessionLabel = document.getElementById('current-session');
+    const thinkingToggle = document.getElementById('enable-thinking');
 
     let isRequesting = false;
     let isComposing = false;
@@ -1056,6 +1102,7 @@
       sendButton.disabled = isRequesting || !hasContent;
       sessionSelect.disabled = isRequesting;
       newSessionButton.disabled = isRequesting;
+      thinkingToggle.disabled = isRequesting;
       sendButton.setAttribute('aria-busy', isRequesting ? 'true' : 'false');
       sendButton.textContent = isRequesting ? '生成中…' : '发送';
     }
@@ -1343,6 +1390,88 @@
       }
     }
 
+    function splitThinking(text) {
+      const start = text.indexOf('<think>');
+      if (start === -1) {
+        return {thinking: '', answer: text};
+      }
+
+      const end = text.indexOf('</think>', start);
+      const thinking = text.slice(start + 7, end === -1 ? text.length : end);
+      const answer = end === -1
+        ? text.slice(0, start)
+        : text.slice(0, start) + text.slice(end + 8);
+
+      return {thinking: thinking.trim(), answer: answer.trim()};
+    }
+
+    function createThinkingDetails() {
+      const details = document.createElement('details');
+      details.className = 'thinking-details';
+
+      const summary = document.createElement('summary');
+      summary.className = 'thinking-summary';
+      summary.textContent = '思考过程';
+
+      const body = document.createElement('div');
+      body.className = 'thinking-body';
+
+      details.appendChild(summary);
+      details.appendChild(body);
+      return details;
+    }
+
+    function renderAssistantContent(container, text) {
+      container.textContent = '';
+      const parts = splitThinking(text);
+
+      if (parts.thinking) {
+        const details = createThinkingDetails();
+        renderSafeMarkdown(
+          details.querySelector('.thinking-body'),
+          parts.thinking,
+        );
+        container.appendChild(details);
+      }
+
+      const answer = document.createElement('div');
+      answer.className = 'assistant-answer';
+      renderSafeMarkdown(
+        answer,
+        parts.answer || (parts.thinking ? '（正式回答为空）' : '（模型返回了空内容）'),
+      );
+      container.appendChild(answer);
+    }
+
+    function updateStreamingAssistant(container, text) {
+      if (!container.dataset.streamingReady) {
+        container.textContent = '';
+        container.dataset.streamingReady = 'true';
+      }
+
+      const parts = splitThinking(text);
+
+      let details = container.querySelector('.thinking-details');
+      if (parts.thinking) {
+        if (!details) {
+          details = createThinkingDetails();
+          details.open = true;
+          container.insertBefore(details, container.querySelector('.assistant-answer'));
+        }
+        details.querySelector('.thinking-body').textContent = parts.thinking;
+      } else if (details) {
+        details.remove();
+      }
+
+      let answer = container.querySelector('.assistant-answer');
+      if (!answer) {
+        answer = document.createElement('div');
+        answer.className = 'assistant-answer';
+        container.appendChild(answer);
+      }
+      answer.textContent = parts.answer;
+    }
+
     function createMessageRow(text, role, labelText) {
       const row = document.createElement('div');
       row.className = `message ${role}`;
@@ -1355,7 +1484,7 @@
       bubble.className = 'bubble';
 
       if (role === 'assistant') {
-        renderSafeMarkdown(bubble, text);
+        renderAssistantContent(bubble, text);
       } else {
         bubble.textContent = text;
       }
@@ -1378,7 +1507,7 @@
 
       const meta = document.createElement('div');
       meta.className = 'msg-meta';
-      meta.textContent = 'model_v3 · 正在等待本地模型生成';
+      meta.textContent = 'model_v4 · 正在等待本地模型生成';
 
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
@@ -1498,7 +1627,7 @@
           addMessage(
             turn.assistant || '（模型返回了空内容）',
             'assistant',
-            `model_v3 · TURN ${label}`,
+            `model_v4 · TURN ${label}`,
             false,
           );
         });
@@ -1575,12 +1704,19 @@
       const pendingMeta = pendingRow.querySelector('.msg-meta');
       let assistantText = '';
       let completed = false;
+      let finishReason = 'stop';
+      let generatedTokens = 0;
+      let maxNewTokens = 0;
 
       try {
         const response = await fetch('/chat/stream', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({message, session_id: sessionId}),
+          body: JSON.stringify({
+            message,
+            session_id: sessionId,
+            enable_thinking: thinkingToggle.checked,
+          }),
         });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -1596,13 +1732,16 @@
           if (event.delta) {
             assistantText += event.delta;
             pendingRow.classList.remove('pending');
-            pendingMeta.textContent = 'model_v3 · 正在流式生成';
-            pendingBubble.textContent = assistantText;
+            pendingMeta.textContent = 'model_v4 · 正在流式生成';
+            updateStreamingAssistant(pendingBubble, assistantText);
             setWorkbenchStatus('busy', '正在接收 SSE 事件…');
             scrollToBottom(isNearBottom());
           }
           if (event.done) {
             completed = true;
+            finishReason = event.finish_reason || 'stop';
+            generatedTokens = event.generated_tokens || 0;
+            maxNewTokens = event.max_new_tokens || 0;
           }
         });
 
@@ -1615,8 +1754,14 @@
         turnCount = nextTurn;
         turnCounter.textContent = String(turnCount).padStart(2, '0');
         const reply = assistantText || '（模型返回了空内容）';
-        addMessage(reply, 'assistant', `model_v3 · Qwen2.5-0.5B · TURN ${turnLabel}`, shouldScrollOnReply);
-        setWorkbenchStatus('ok', '就绪 · SSE 流式返回');
+        addMessage(reply, 'assistant', `model_v4 · QWEN3-0.6B · TURN ${turnLabel}`, shouldScrollOnReply);
+        if (finishReason === 'length') {
+          const tokenLimit = maxNewTokens || generatedTokens;
+          setWorkbenchStatus('error', '已达生成上限 · 回答可能不完整');
+          showErrorBanner(`本次已达到 ${tokenLimit} tokens 生成上限，回答可能不完整。可增大 LVCHAT_MAX_NEW_TOKENS 后重试。`);
+        } else {
+          setWorkbenchStatus('ok', '就绪 · SSE 流式返回');
+        }
         refreshSessionList().catch(() => {});
       } catch (error) {
         const shouldScrollOnError = isNearBottom();

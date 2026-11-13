@@ -237,6 +237,8 @@ def test_ask_stream_matches_ask_and_preserves_state():
     assert streaming.history == synchronous.history
     assert streaming.cached_token_ids == synchronous.cached_token_ids
     assert streaming.next_position == synchronous.next_position
+    assert streaming.last_generated_tokens == 3
+    assert streaming.last_finish_reason == "length"
 
     for stream_layer, sync_layer in zip(
         streaming.past_kv,
@@ -244,6 +246,31 @@ def test_ask_stream_matches_ask_and_preserves_state():
     ):
         for stream_tensor, sync_tensor in zip(stream_layer, sync_layer):
             assert torch.equal(stream_tensor, sync_tensor)
+
+
+def test_ask_stream_waits_for_incomplete_utf8_suffix():
+    class IncompleteUtf8Tokenizer(AsciiTokenizer):
+        def decode(self, idx):
+            if idx == [1]:
+                return ""
+            if idx == [1, 2]:
+                return "总结"
+            return super().decode(idx)
+
+    session = build_session(context_size=512)
+    session.tokenizer = IncompleteUtf8Tokenizer()
+
+    def fake_generate_stream(model, idx, **kwargs):
+        yield torch.tensor(1)
+        yield torch.tensor(2)
+        cache = torch.zeros(1, 1, idx.shape[1] + 2, 1)
+        return None, [(cache, cache)]
+
+    with patch("squid.generate.chat.generate_stream", new=fake_generate_stream):
+        deltas = list(session.ask_stream("one"))
+
+    assert deltas == ["总结"]
+    assert session.history == [("one", "总结")]
 
 
 def test_incomplete_stream_invalidates_cache_and_can_recover():
