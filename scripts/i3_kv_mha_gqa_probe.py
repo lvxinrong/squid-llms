@@ -12,10 +12,16 @@ from pathlib import Path
 
 import torch
 from torch import nn
-
-from squid.device import get_device, memory_snapshot
-from squid.generate.benchmark import kv_cache_nbytes
+from squid.generate.benchmark import (
+    kv_cache_nbytes,
+    synchronize,
+)
 from squid.model.v3_modern.layers import GroupedQueryAttention
+from squid.device import (
+    get_device,
+    memory_snapshot,
+    reset_peak_memory_stats,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +55,12 @@ def run_probe(n_kv_heads):
         config["emb_dim"],
         device=device,
     )
+    with torch.no_grad():
+        for attention in attentions:
+            attention(x)
+
+    synchronize(device)
+    reset_peak_memory_stats(device)
     memory_before = memory_snapshot(device)
 
     caches = []
