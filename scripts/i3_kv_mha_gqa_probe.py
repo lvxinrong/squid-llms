@@ -88,6 +88,8 @@ def run_probe(n_kv_heads):
         "driver_allocated_delta_bytes": (
             memory_after["driver_allocated_bytes"]
             - memory_before["driver_allocated_bytes"]
+            if device.type == "mps"
+            else None
         ),
         "memory_before": memory_before,
         "memory_after": memory_after,
