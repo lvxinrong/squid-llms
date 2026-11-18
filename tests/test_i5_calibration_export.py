@@ -206,4 +206,3 @@ def test_export_guard_protects_human_labels(tmp_path):
 
     with pytest.raises(RuntimeError, match="拒绝覆盖"):
         assert_safe_to_export(blind_path)
-
