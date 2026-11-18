@@ -17,6 +17,8 @@ from squid.device import get_device
 from squid.generate.chat import ChatSession, build_qwen_chat_prompt
 from squid.generate.session_store import SessionStore
 from squid.tokenizer.qwen_tokenizer import QwenTokenizerAdapter
+from squid.checkpoints.store import load_checkpoint
+from squid.model.v4_qwen3.gpt import GPTModelV4
 
 
 SESSION_STORE = None
@@ -181,11 +183,27 @@ def main():
     #     device=get_device(),
     # )
     # tokenizer = QwenTokenizerAdapter("Qwen/Qwen2.5-0.5B-Instruct")
-    model = load_qwen3_dir(
-        model_dir,
-        context_size=context_size,
-        device=get_device(),
-    )
+    checkpoint_name = os.getenv("LVCHAT_CHECKPOINT")
+
+    if checkpoint_name:
+        checkpoint_path = (
+            root / "data/model_pth/qwen3" / checkpoint_name
+        )
+        checkpoint = load_checkpoint(checkpoint_path)
+        model_cfg = {
+            **checkpoint["config"],
+            "context_length": context_size,
+        }
+        model = GPTModelV4(model_cfg)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(get_device())
+        model.eval()
+    else:
+        model = load_qwen3_dir(
+            model_dir,
+            context_size=context_size,
+            device=get_device(),
+        )
     tokenizer = QwenTokenizerAdapter(str(model_dir))
     prompt_builder = partial(
         build_qwen_chat_prompt,
