@@ -247,7 +247,8 @@ def main():
         "adapter_bytes": adapter_path.stat().st_size,
         "adapter_reload": "passed",
         "boundary": (
-            "当前仅为 3 train + 1 val 的小批量 LoRA 对照；"
+            f"当前仅为 {train_count} train + {val_count} val "
+            "的小批量 LoRA 对照；"
             "不证明 held-out 或未见项目修复能力提升。"
         ),
         "best_adapter": args.best_adapter,

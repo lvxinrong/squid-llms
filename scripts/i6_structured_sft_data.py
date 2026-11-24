@@ -176,7 +176,7 @@ def main():
 
     entry = {
         "instance_id": case["instance_id"],
-        "data_role": "structured_train_smoke",
+        "data_role": f"structured_{case['data_role']}",
         "messages": messages,
         "edit": edit,
         "token_audit": {
