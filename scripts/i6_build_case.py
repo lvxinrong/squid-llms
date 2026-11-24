@@ -5,6 +5,30 @@ import subprocess
 from pathlib import Path
 
 
+JAVA_SOURCE_ROOTS = ("src/main/java", "src/java", "src")
+JAVA_TEST_ROOTS = ("src/test/java", "src/test", "test")
+
+def find_java_file(root, class_name, candidate_roots):
+    root = Path(root)
+    relative = f"{class_name.replace('.', '/')}.java"
+    candidates = [
+        root / source_root / relative
+        for source_root in candidate_roots
+        if (root / source_root / relative).is_file()
+    ]
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"{root} 中找不到 {relative}；"
+            f"已检查：{', '.join(candidate_roots)}"
+        )
+    if len(candidates) != 1:
+        raise ValueError(
+            f"{root} 中的 {relative} 不唯一：{candidates}"
+        )
+
+    return candidates[0]
+
 def query_metadata(
     project,
     bug_id,
@@ -137,16 +161,26 @@ def main():
         trigger_test_override=args.trigger_test,
     )
 
-    source_file = (
-        f"src/main/java/"
-        f"{metadata['target_class'].replace('.', '/')}.java"
+    buggy_file = find_java_file(
+        workdir / "buggy",
+        metadata["target_class"],
+        JAVA_SOURCE_ROOTS,
     )
-    test_class = metadata["trigger_test"].split("::", 1)[0]
-    test_file = f"src/test/java/{test_class.replace('.', '/')}.java"
+    fixed_file = find_java_file(
+        workdir / "fixed",
+        metadata["target_class"],
+        JAVA_SOURCE_ROOTS,
+    )
+    source_file = buggy_file.relative_to(
+        workdir / "buggy"
+    ).as_posix()
 
-    buggy_file = workdir / "buggy" / source_file
-    fixed_file = workdir / "fixed" / source_file
-    trigger_file = workdir / "buggy" / test_file
+    test_class = metadata["trigger_test"].split("::", 1)[0]
+    trigger_file = find_java_file(
+        workdir / "buggy",
+        test_class,
+        JAVA_TEST_ROOTS,
+    )
 
     buggy_lines = buggy_file.read_text(
         encoding="utf-8"

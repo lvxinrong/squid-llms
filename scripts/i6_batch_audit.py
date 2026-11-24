@@ -77,6 +77,11 @@ def main():
     audit_namespace = runpy.run_path(str(
         root / "scripts/i6_patch_audit.py"
     ))
+    builder_namespace = runpy.run_path(str(
+        root / "scripts/i6_build_case.py"
+    ))
+    find_java_file = builder_namespace["find_java_file"]
+    java_source_roots = builder_namespace["JAVA_SOURCE_ROOTS"]
     audit_file = audit_namespace["audit_file"]
 
     metadata = query_all(args.project)
@@ -155,15 +160,36 @@ def main():
 
 
         file_audits = []
+        errors = []
 
-        for target_class in bug["target_classes"]:
-            source_file = (
-                f"src/main/java/{target_class.replace('.', '/')}.java"
-            )
-            file_audits.append(audit_file(
-                workdir / "buggy" / source_file,
-                workdir / "fixed" / source_file,
-            ))
+        try:
+            for target_class in bug["target_classes"]:
+                buggy_file = find_java_file(
+                    workdir / "buggy",
+                    target_class,
+                    java_source_roots,
+                )
+                fixed_file = find_java_file(
+                    workdir / "fixed",
+                    target_class,
+                    java_source_roots,
+                )
+                file_audit = audit_file(
+                    buggy_file,
+                    fixed_file,
+                )
+                file_audit["source_file"] = (
+                    buggy_file.relative_to(
+                        workdir / "buggy"
+                    ).as_posix()
+                )
+                file_audits.append(file_audit)
+
+            classification = classify_bug(file_audits)
+        except (OSError, RuntimeError, ValueError) as error:
+            classification = "audit_error"
+            file_audits = []
+            errors.append(str(error))
 
         entries.append({
             "instance_id": instance_id,
@@ -171,11 +197,13 @@ def main():
             "fixed_commit": bug["fixed_commit"],
             "target_classes": bug["target_classes"],
             "trigger_tests": bug["trigger_tests"],
-            "classification": classify_bug(file_audits),
+            "classification": classification,
             "files": file_audits,
             "workdir": str(workdir),
+            "errors": errors,
             "tests_verified_by_this_script": False,
         })
+
 
     report = {
         "schema_version": "i6-batch-audit-v1",

@@ -72,6 +72,10 @@ def main():
     reference_diff = builder_namespace["reference_diff"]
     method_declarations = audit_namespace["method_declarations"]
 
+    find_java_file = builder_namespace["find_java_file"]
+    java_source_roots = builder_namespace["JAVA_SOURCE_ROOTS"]
+    java_test_roots = builder_namespace["JAVA_TEST_ROOTS"]
+
     report = json.loads(
         Path(args.audit_report).read_text(encoding="utf-8")
     )
@@ -114,12 +118,21 @@ def main():
 
         try:
             target_class = entry["target_classes"][0]
-            source_file = (
-                f"src/main/java/{target_class.replace('.', '/')}.java"
-            )
             workdir = Path(entry["workdir"])
-            buggy_file = workdir / "buggy" / source_file
-            fixed_file = workdir / "fixed" / source_file
+            buggy_file = find_java_file(
+                workdir / "buggy",
+                target_class,
+                java_source_roots,
+            )
+            fixed_file = find_java_file(
+                workdir / "fixed",
+                target_class,
+                java_source_roots,
+            )
+            source_file = buggy_file.relative_to(
+                workdir / "buggy"
+            ).as_posix()
+
 
             buggy_lines = buggy_file.read_text(
                 encoding="utf-8"
@@ -140,11 +153,10 @@ def main():
             trigger_test = entry["trigger_tests"][0]
             test_class = trigger_test.split("::", 1)[0]
             test_method = trigger_test.rsplit("::", 1)[-1]
-            test_file = (
-                workdir
-                / "buggy"
-                / "src/test/java"
-                / f"{test_class.replace('.', '/')}.java"
+            test_file = find_java_file(
+                workdir / "buggy",
+                test_class,
+                java_test_roots,
             )
             test_lines = test_file.read_text(
                 encoding="utf-8"
