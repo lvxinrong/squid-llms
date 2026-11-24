@@ -15,32 +15,60 @@ MODEL_DIR = ROOT / "data/model_pth/qwen3/qwen3-0_6b"
 def reference_to_edit(reference_patch, target_method):
     old_lines = []
     new_lines = []
+    context_lines = []
     hunk_count = 0
+    in_hunk = False
 
     for line in reference_patch.splitlines():
         if line.startswith("@@"):
             hunk_count += 1
+            in_hunk = True
+            context_lines = []
             continue
 
+        if not in_hunk:
+            continue
         if line.startswith(("diff --git", "index ", "---", "+++")):
             continue
 
-        if line.startswith("-"):
+        if line.startswith(" "):
+            context_lines.append(line[1:])
+        elif line.startswith("-"):
             old_lines.append(line[1:])
         elif line.startswith("+"):
             new_lines.append(line[1:])
 
     if hunk_count != 1:
         raise ValueError("第一版只支持单个连续修改块")
-    if not old_lines or not new_lines:
-        raise ValueError("当前替换契约要求同时包含删除行与新增行")
+    if not old_lines and not new_lines:
+        raise ValueError("没有可转换的修改")
+
+    if old_lines and new_lines:
+        return {
+            "action": "replace",
+            "target_method": target_method,
+            "old_text": "\n".join(old_lines),
+            "new_text": "\n".join(new_lines),
+        }
+
+    if old_lines:
+        return {
+            "action": "delete",
+            "target_method": target_method,
+            "old_text": "\n".join(old_lines),
+            "new_text": "",
+        }
+
+    if not context_lines:
+        raise ValueError("纯插入缺少唯一上下文锚点")
 
     return {
-        "action": "replace",
+        "action": "insert_after",
         "target_method": target_method,
-        "old_text": "\n".join(old_lines),
+        "old_text": context_lines[-1],
         "new_text": "\n".join(new_lines),
     }
+
 
 
 def main():

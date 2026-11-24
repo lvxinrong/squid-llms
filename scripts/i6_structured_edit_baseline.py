@@ -32,7 +32,8 @@ def validate_edit(case, edit):
     if not required.issubset(edit):
         return {"status": "missing_fields"}
 
-    if edit["action"] != "replace":
+    action = edit["action"]
+    if action not in {"replace", "insert_after", "delete"}:
         return {"status": "unsupported_action"}
 
     signature = re.search(
@@ -49,9 +50,13 @@ def validate_edit(case, edit):
     old_text = edit["old_text"]
     new_text = edit["new_text"]
 
-    if not old_text or not new_text:
+    if not old_text:
+        return {"status": "empty_anchor"}
+    if action in {"replace", "insert_after"} and not new_text:
         return {"status": "empty_edit"}
-    if old_text == new_text:
+    if action == "delete" and new_text:
+        return {"status": "delete_must_have_empty_new_text"}
+    if action == "replace" and old_text == new_text:
         return {"status": "no_op_edit"}
 
     match_count = case["buggy_source"].count(old_text)
@@ -64,6 +69,7 @@ def validate_edit(case, edit):
         "status": "ready_to_apply",
         "match_count": 1,
     }
+
 
 
 def main():

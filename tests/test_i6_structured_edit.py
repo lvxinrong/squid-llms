@@ -46,3 +46,42 @@ def test_duplicate_match_is_rejected():
         },
     )
     assert result["status"] == "no_op_edit"
+
+
+def test_insert_after_preserves_anchor_and_new_content():
+    result = validate_edit(
+        case(),
+        {
+            "action": "insert_after",
+            "target_method": "createNumber",
+            "old_text": 'str.startsWith("0x")',
+            "new_text": "// 补充大写前缀处理",
+        },
+    )
+    assert result["status"] == "ready_to_apply"
+
+
+def test_delete_allows_empty_new_text():
+    result = validate_edit(
+        case(),
+        {
+            "action": "delete",
+            "target_method": "createNumber",
+            "old_text": 'str.startsWith("0x")',
+            "new_text": "",
+        },
+    )
+    assert result["status"] == "ready_to_apply"
+
+
+def test_replace_still_rejects_no_op():
+    result = validate_edit(
+        case(),
+        {
+            "action": "replace",
+            "target_method": "createNumber",
+            "old_text": 'str.startsWith("0x")',
+            "new_text": 'str.startsWith("0x")',
+        },
+    )
+    assert result["status"] == "no_op_edit"
