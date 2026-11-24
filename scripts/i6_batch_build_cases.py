@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--exclude", default="")
     parser.add_argument(
         "--data-role",
-        choices=("train_candidate", "validation_candidate"),
+        choices=("train_candidate", "validation_candidate", "eval_holdout",),
         default="train_candidate",
     )
     args = parser.parse_args()
