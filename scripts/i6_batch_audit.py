@@ -67,6 +67,10 @@ def main():
     parser.add_argument("--bug-ids", required=True)
     parser.add_argument("--workroot", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--checkout-missing",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -89,10 +93,42 @@ def main():
         instance_id = f"{args.project}-{bug_id}"
         workdir = workroot / instance_id.lower()
 
-        if not (
+        workdir_missing = not (
+            (workdir / "buggy").is_dir()
+            and (workdir / "fixed").is_dir()
+        )
+
+        if workdir_missing and args.checkout_missing:
+            workdir.mkdir(parents=True, exist_ok=True)
+
+            for version, directory in (
+                ("b", "buggy"),
+                ("f", "fixed"),
+            ):
+                target = workdir / directory
+                if target.is_dir():
+                    continue
+
+                subprocess.run(
+                    [
+                        "defects4j",
+                        "checkout",
+                        "-p",
+                        args.project,
+                        "-v",
+                        f"{bug_id}{version}",
+                        "-w",
+                        str(target),
+                    ],
+                    check=True,
+                )
+
+            workdir_missing = not (
                 (workdir / "buggy").is_dir()
                 and (workdir / "fixed").is_dir()
-        ):
+            )
+
+        if workdir_missing:
             entries.append({
                 "instance_id": instance_id,
                 "buggy_commit": bug["buggy_commit"],
@@ -105,6 +141,7 @@ def main():
                 "tests_verified_by_this_script": False,
             })
             continue
+
 
         file_audits = []
 
