@@ -123,31 +123,10 @@ def main():
     validation = namespace["validate_edit"](case, edit)
     assert validation["status"] == "ready_to_apply", validation
 
-    task = f"""你是一名 Java 程序修复助手。请定位缺陷，并输出一个最小局部编辑。
-
-只输出一个 JSON 对象，不要 Markdown 或解释：
-{{
-  "action": "replace",
-  "target_method": "{target_method}",
-  "old_text": "输入源码中需要修改的连续原文",
-  "new_text": "用于替换 old_text 的最小修复代码"
-}}
-
-要求：
-- old_text 必须从输入源码中精确复制。
-- old_text 在目标方法中必须只出现一次。
-- new_text 只修复缺陷，不做无关重写。
-
-[目标类]
-{case["target_class"]}
-
-[Buggy 方法源码]
-{case["buggy_source"]}
-
-[触发测试]
-{case["trigger_test"]}
-
-{case["test_source"]}"""
+    task = namespace["build_structured_task"](
+        case,
+        target_method,
+    )
 
     messages = [
         {

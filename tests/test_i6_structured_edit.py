@@ -85,3 +85,25 @@ def test_replace_still_rejects_no_op():
         },
     )
     assert result["status"] == "no_op_edit"
+
+
+def test_structured_task_contains_contract_and_all_inputs():
+    task_case = {
+        **case(),
+        "target_class": "example.NumberUtils",
+        "trigger_test": "example.NumberUtilsTest::testCreateNumber",
+        "test_source": "public void testCreateNumber() {}",
+    }
+
+    task = namespace["build_structured_task"](
+        task_case,
+        "createNumber",
+    )
+
+    assert "不要输出完整方法" in task
+    assert "不能修改测试" not in task
+    assert "不要修改测试" in task
+    assert task_case["target_class"] in task
+    assert task_case["buggy_source"] in task
+    assert task_case["trigger_test"] in task
+    assert task_case["test_source"] in task
