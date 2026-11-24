@@ -26,6 +26,15 @@ def add_lora(model, rank, alpha):
         alpha=alpha,
     )
 
+def read_adapter_config(path):
+    payload = torch.load(
+        path,
+        map_location="cpu",
+        weights_only=True,
+    )
+    return payload["rank"], payload["alpha"]
+
+
 def build_structured_task(case, target_method):
     return f"""你是一名 Java 程序修复助手。请定位缺陷，并输出一个最小局部编辑。
 
@@ -130,10 +139,21 @@ def main():
         device=device,
     )
 
+    adapter_rank = None
+    adapter_alpha = None
+
     if args.adapter:
-        add_lora(model, rank=8, alpha=16)
+        adapter_rank, adapter_alpha = read_adapter_config(
+            args.adapter
+        )
+        add_lora(
+            model,
+            rank=adapter_rank,
+            alpha=adapter_alpha,
+        )
         load_lora(model, args.adapter, strict=True)
         model.to(device).eval()
+
 
     prompt = build_qwen_chat_prompt(
         tokenizer,
@@ -192,6 +212,8 @@ def main():
         ),
         "reference_patch_in_prompt": False,
         "adapter": args.adapter,
+        "adapter_rank": adapter_rank,
+        "adapter_alpha": adapter_alpha,
     }
 
     report_path = Path(args.report)

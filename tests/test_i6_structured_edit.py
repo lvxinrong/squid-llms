@@ -1,5 +1,7 @@
 import runpy
 from pathlib import Path
+import torch
+
 
 
 namespace = runpy.run_path(str(
@@ -107,3 +109,12 @@ def test_structured_task_contains_contract_and_all_inputs():
     assert task_case["buggy_source"] in task
     assert task_case["trigger_test"] in task
     assert task_case["test_source"] in task
+
+def test_read_adapter_config_from_checkpoint(tmp_path):
+    path = tmp_path / "adapter.pth"
+    torch.save({"rank": 16, "alpha": 32}, path)
+
+    result = namespace["read_adapter_config"](path)
+
+    assert result == (16, 32)
+
