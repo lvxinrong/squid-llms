@@ -12,15 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = ROOT / "data/model_pth/qwen3/qwen3-0_6b"
 
 
-def reference_to_edit(reference_patch, target_method):
-    old_hunk = []
-    new_hunk = []
+def reference_to_edit(reference_patch, target_method, buggy_source):
+    hunk = []
     hunk_count = 0
     in_hunk = False
 
     for line in reference_patch.splitlines():
         if line.startswith("@@"):
             hunk_count += 1
+            if in_hunk:
+                break
             in_hunk = True
             continue
 
@@ -30,24 +31,70 @@ def reference_to_edit(reference_patch, target_method):
             continue
 
         if line.startswith(" "):
-            old_hunk.append(line[1:])
-            new_hunk.append(line[1:])
+            hunk.append((" ", line[1:]))
         elif line.startswith("-"):
-            old_hunk.append(line[1:])
+            hunk.append(("-", line[1:]))
         elif line.startswith("+"):
-            new_hunk.append(line[1:])
+            hunk.append(("+", line[1:]))
 
     if hunk_count != 1:
         raise ValueError("第一版只支持单个连续修改块")
-    if not old_hunk and not new_hunk:
+
+    changed = [
+        index
+        for index, (kind, _) in enumerate(hunk)
+        if kind in {"-", "+"}
+    ]
+    if not changed:
         raise ValueError("没有可转换的修改")
 
-    return {
-        "action": "replace",
-        "target_method": target_method,
-        "old_text": "\n".join(old_hunk),
-        "new_text": "\n".join(new_hunk),
-    }
+    first_change = changed[0]
+    last_change = changed[-1] + 1
+    max_left = first_change
+    max_right = len(hunk) - last_change
+
+    for extra in range(max_left + max_right + 1):
+        for left in range(min(extra, max_left), -1, -1):
+            right = extra - left
+            if right > max_right:
+                continue
+
+            start = first_change - left
+            end = last_change + right
+            selected = hunk[start:end]
+
+            old_text = "\n".join(
+                text
+                for kind, text in selected
+                if kind != "+"
+            )
+            new_text = "\n".join(
+                text
+                for kind, text in selected
+                if kind != "-"
+            )
+
+            if not old_text or not new_text:
+                continue
+
+            if buggy_source.count(old_text) == 1:
+                return {
+                    "action": "replace",
+                    "target_method": target_method,
+                    "old_text": old_text,
+                    "new_text": new_text,
+                }
+
+    core_old = "\n".join(
+        text
+        for kind, text in hunk[first_change:last_change]
+        if kind != "+"
+    )
+    if core_old and buggy_source.count(core_old) == 0:
+        raise ValueError("修改核心无法在目标方法中精确匹配")
+
+    raise ValueError("无法构造非空且唯一的局部编辑")
+
 
 
 
@@ -63,9 +110,11 @@ def main():
     key = json.loads(Path(args.key).read_text(encoding="utf-8"))
 
     target_method = re_target_method(case["buggy_source"])
+
     edit = reference_to_edit(
         key["reference_patch"],
         target_method,
+        case["buggy_source"],
     )
 
     namespace = runpy.run_path(str(
