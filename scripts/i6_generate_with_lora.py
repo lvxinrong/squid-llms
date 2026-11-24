@@ -107,7 +107,7 @@ def main():
 
     report = {
         "instance_id": case["instance_id"],
-        "data_role": case["data_role"],
+        "data_role": case.get("data_role", "legacy_eval_holdout"),
         "base_model": "Qwen3-0.6B original",
         "adapter": args.adapter,
         "rank": 8,
