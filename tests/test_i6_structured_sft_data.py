@@ -27,3 +27,48 @@ def test_reference_patch_becomes_minimal_replace_edit():
             'str.startsWith("0X")) {'
         ),
     }
+
+def test_reference_edit_preserves_contiguous_context():
+    patch = """diff --git a/Demo.java b/Demo.java
+@@ -1,4 +1,4 @@
+ class Demo {
+-    int value = 1;
++    int value = 2;
+     int other = 3;
+ }
+"""
+
+    edit = reference_to_edit(patch, "demo")
+
+    assert edit["action"] == "replace"
+    assert edit["old_text"] == (
+        "class Demo {\n"
+        "    int value = 1;\n"
+        "    int other = 3;\n"
+        "}"
+    )
+    assert edit["new_text"] == (
+        "class Demo {\n"
+        "    int value = 2;\n"
+        "    int other = 3;\n"
+        "}"
+    )
+
+
+def test_pure_insert_keeps_anchor_context():
+    patch = """@@ -1,2 +1,3 @@
+ class Demo {
++    int added = 1;
+     int other = 3;
+"""
+
+    edit = reference_to_edit(patch, "demo")
+
+    assert edit["action"] == "replace"
+    assert edit["old_text"] == "class Demo {\n    int other = 3;"
+    assert edit["new_text"] == (
+        "class Demo {\n"
+        "    int added = 1;\n"
+        "    int other = 3;"
+    )
+
