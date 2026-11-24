@@ -71,12 +71,15 @@ def locate_methods(lines, hunks):
     changed = set()
 
     for hunk in hunks:
-        line_number = hunk["old_start"]
+        hunk_start = hunk["old_start"]
+        hunk_end = (
+            hunk_start + max(hunk["old_count"] - 1, 0)
+        )
         found = False
 
         for declaration in declarations:
             start = declaration["index"]
-            if start + 1 > line_number:
+            if start + 1 > hunk_end:
                 continue
 
             marker = lines[start].strip()
@@ -86,14 +89,13 @@ def locate_methods(lines, hunks):
                 continue
 
             if (
-                block["start_line"] <= line_number
-                <= block["end_line"]
+                    block["start_line"] <= hunk_end
+                    and block["end_line"] >= hunk_start
             ):
                 changed.add(
                     f"{declaration['kind']}:{declaration['name']}"
                 )
                 found = True
-                break
 
         if not found:
             changed.add("class_level_or_unknown")

@@ -40,3 +40,21 @@ def test_changed_methods_use_method_boundaries():
     )
 
     assert result == ["method:first"]
+
+
+def test_hunk_can_start_before_method_declaration():
+    lines = [
+        "class Demo {",
+        "    /** 方法说明 */",
+        "    public int first() {",
+        "        return 1;",
+        "    }",
+        "}",
+    ]
+
+    result = locate_methods(
+        lines,
+        [{"old_start": 2, "old_count": 3}],
+    )
+
+    assert result == ["method:first"]
