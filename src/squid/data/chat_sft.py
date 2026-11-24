@@ -74,16 +74,27 @@ def find_assistant_spans(tokenizer, messages, full_text, full_ids):
     return spans
 
 
-def encode_qwen_multiturn(tokenizer, messages):
+def encode_qwen_multiturn(
+    tokenizer,
+    messages,
+    enable_thinking=None,
+):
+    template_kwargs = {
+        "tokenize": False,
+        "add_generation_prompt": False,
+    }
+    if enable_thinking is not None:
+        template_kwargs["enable_thinking"] = enable_thinking
+
     full_text = tokenizer.apply_chat_template(
         messages,
-        tokenize=False,
-        add_generation_prompt=False,
+        **template_kwargs,
     )
+
+    template_kwargs["tokenize"] = True
     encoded = tokenizer.apply_chat_template(
         messages,
-        tokenize=True,
-        add_generation_prompt=False,
+        **template_kwargs,
     )
 
     full_ids = encoded["input_ids"]
@@ -102,13 +113,14 @@ def encode_qwen_multiturn(tokenizer, messages):
 
 
 class QwenMultiTurnDataset(Dataset):
-    def __init__(self, data, tokenizer):
+    def __init__(self, data, tokenizer, enable_thinking=None):
         self.encoded_samples = []
 
         for entry in data:
             inputs, targets = encode_qwen_multiturn(
                 tokenizer,
                 entry["messages"],
+                enable_thinking=enable_thinking,
             )
             self.encoded_samples.append((inputs, targets))
 

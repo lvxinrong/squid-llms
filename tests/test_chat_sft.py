@@ -247,3 +247,34 @@ def test_qwen_multiturn_cot_history_matches_template_visibility():
         == second_expected
     )
 
+
+def test_qwen_dataset_can_explicitly_disable_thinking():
+    from squid.data.chat_sft import encode_qwen_multiturn
+
+    root = Path(__file__).resolve().parents[1]
+    model_dir = root / "data/model_pth/qwen3/qwen3-0_6b"
+    tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
+
+    messages = [
+        {"role": "system", "content": "你是一个助手。"},
+        {"role": "user", "content": "你好。"},
+        {"role": "assistant", "content": "你好。"},
+    ]
+
+    inputs, targets = encode_qwen_multiturn(
+        tokenizer,
+        messages,
+        enable_thinking=False,
+    )
+    expected = tokenizer.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=False,
+        enable_thinking=False,
+    )["input_ids"]
+
+    assert inputs == expected[:-1]
+    assert len(inputs) == len(targets)
+    assert any(target != -100 for target in targets)
+
+

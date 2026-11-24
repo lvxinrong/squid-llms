@@ -21,10 +21,19 @@ from squid.train.common import calc_loss_loader
 from squid.train.sft import sft_train_model
 
 
-def build_loader(path, tokenizer, batch_size, shuffle):
+def build_loader(
+    path,
+    tokenizer,
+    batch_size,
+    shuffle,
+    enable_thinking=None,
+):
     data = json.loads(path.read_text(encoding="utf-8"))
-    dataset = QwenMultiTurnDataset(data, tokenizer)
-
+    dataset = QwenMultiTurnDataset(
+        data,
+        tokenizer,
+        enable_thinking=enable_thinking,
+    )
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
