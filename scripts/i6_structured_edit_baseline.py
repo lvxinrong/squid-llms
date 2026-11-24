@@ -9,10 +9,22 @@ from transformers import AutoTokenizer
 from squid.checkpoints.qwen3 import load_qwen3_dir
 from squid.generate.chat import build_qwen_chat_prompt
 from squid.generate.engine import generate
+from squid.checkpoints.lora import load_lora
+from squid.model.lora import replace_linear_with_lora
+
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = ROOT / "data/model_pth/qwen3/qwen3-0_6b"
+
+def add_lora(model, rank, alpha):
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+    replace_linear_with_lora(
+        model,
+        rank=rank,
+        alpha=alpha,
+    )
 
 
 def validate_edit(case, edit):
@@ -58,6 +70,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--case", required=True)
     parser.add_argument("--report", required=True)
+    parser.add_argument("--adapter", default=None)
+
     args = parser.parse_args()
 
     case = json.loads(Path(args.case).read_text(encoding="utf-8"))
@@ -105,6 +119,11 @@ def main():
         context_size=8192,
         device=device,
     )
+
+    if args.adapter:
+        add_lora(model, rank=8, alpha=16)
+        load_lora(model, args.adapter, strict=True)
+        model.to(device).eval()
 
     prompt = build_qwen_chat_prompt(
         tokenizer,
@@ -162,6 +181,7 @@ def main():
             else "length"
         ),
         "reference_patch_in_prompt": False,
+        "adapter": args.adapter,
     }
 
     report_path = Path(args.report)
