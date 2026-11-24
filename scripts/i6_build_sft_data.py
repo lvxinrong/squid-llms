@@ -59,11 +59,33 @@ def build_entry(case, fixed_method):
         ],
     }
 
+def discover_case_paths(case_dir):
+    train_paths = []
+    val_paths = []
+    skipped = []
+
+    for path in sorted(Path(case_dir).glob("*-case.json")):
+        case = json.loads(path.read_text(encoding="utf-8"))
+        role = case.get("data_role")
+
+        if (
+            role == "train_candidate"
+            and case.get("excluded_from_training") is False
+        ):
+            train_paths.append(path)
+        elif role == "validation_candidate":
+            val_paths.append(path)
+        else:
+            skipped.append(path)
+
+    return train_paths, val_paths, skipped
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train", nargs="+", required=True)
-    parser.add_argument("--val", nargs="+", required=True)
+    parser.add_argument("--train", nargs="+", default=None)
+    parser.add_argument("--val", nargs="+", default=None)
+    parser.add_argument("--case-dir", default=None)
     parser.add_argument("--train-output", required=True)
     parser.add_argument("--val-output", required=True)
     parser.add_argument(
@@ -72,8 +94,17 @@ def main():
     )
     args = parser.parse_args()
 
-    train_paths = [Path(path) for path in args.train]
-    val_paths = [Path(path) for path in args.val]
+    if args.case_dir:
+        train_paths, val_paths, skipped = discover_case_paths(
+            args.case_dir
+        )
+        print(f"skipped case files: {len(skipped)}")
+    else:
+        if not args.train or not args.val:
+            parser.error("请显式提供 --train / --val，或使用 --case-dir")
+
+        train_paths = [Path(path) for path in args.train]
+        val_paths = [Path(path) for path in args.val]
 
     all_ids = []
     for path in train_paths:
