@@ -39,7 +39,9 @@ def main():
     )
 
     signature = re.search(
-        r"public static \w+\s+(\w+)\s*\(",
+        r"(?:public|protected|private)\s+"
+        r"(?:static\s+)?(?:final\s+)?"
+        r"[\w$<>\[\],.?]+\s+(\w+)\s*\(",
         case["buggy_source"],
     )
     assert signature is not None
