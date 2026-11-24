@@ -6,7 +6,7 @@ from squid.train.common import lr_at_step, calc_loss_batch, evaluate_model
 def sft_train_model(
         model, train_loader, val_loader, optimizer,
         device, n_epochs, eval_freq, eval_iter,
-        warmup_steps, initial_lr=3e-5, min_lr=1e-6):
+        warmup_steps, initial_lr=3e-5, min_lr=1e-6, on_evaluate=None):
     train_losses, val_losses, track_tokens_seen, track_lrs = [], [], [], []
     tokens_seen, global_step = 0, -1
 
@@ -40,6 +40,14 @@ def sft_train_model(
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 track_tokens_seen.append(tokens_seen)
+                if on_evaluate is not None:
+                    on_evaluate({
+                        "epoch": epoch + 1,
+                        "global_step": global_step,
+                        "train_loss": train_loss,
+                        "val_loss": val_loss,
+                        "tokens_seen": tokens_seen,
+                    })
                 print(f"Ep {epoch + 1} (Step {global_step: 06d}): "
                       f"Train loss {train_loss:.3f},"
                       f"Val loss {val_loss:.3f}"

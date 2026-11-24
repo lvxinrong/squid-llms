@@ -40,6 +40,7 @@ def main():
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--alpha", type=int, default=16)
     parser.add_argument("--context-size", type=int, default=2048)
+    parser.add_argument("--best-adapter", default=None)
     args = parser.parse_args()
 
     seed = 123
@@ -113,6 +114,41 @@ def main():
     total_steps = len(train_loader) * args.epochs
     warmup_steps = max(1, int(total_steps * 0.1))
 
+    best_val_loss = float("inf")
+    best_step = None
+    best_epoch = None
+    on_evaluate = None
+
+    if args.best_adapter:
+        best_adapter_path = Path(args.best_adapter)
+        best_adapter_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        def on_evaluate(metrics):
+            nonlocal best_val_loss, best_step, best_epoch
+
+            if metrics["val_loss"] >= best_val_loss:
+                return
+
+            best_val_loss = metrics["val_loss"]
+            best_step = metrics["global_step"] + 1
+            best_epoch = metrics["epoch"]
+
+            save_lora(
+                best_adapter_path,
+                model,
+                rank=args.rank,
+                alpha=args.alpha,
+                train_samples=train_count,
+                val_samples=val_count,
+                n_epochs=args.epochs,
+                optimization_steps=best_step,
+                final_full_val_loss=best_val_loss,
+            )
+
+
     train_losses, val_losses, tokens_seen, learning_rates = (
         sft_train_model(
             model=model,
@@ -126,6 +162,7 @@ def main():
             warmup_steps=warmup_steps,
             initial_lr=1e-6,
             min_lr=1e-7,
+            on_evaluate=on_evaluate,
         )
     )
 
@@ -213,6 +250,12 @@ def main():
             "当前仅为 3 train + 1 val 的小批量 LoRA 对照；"
             "不证明 held-out 或未见项目修复能力提升。"
         ),
+        "best_adapter": args.best_adapter,
+        "best_val_loss": (
+            best_val_loss if best_step is not None else None
+        ),
+        "best_step": best_step,
+        "best_epoch": best_epoch,
     }
 
     report_path = Path(args.report)
@@ -221,6 +264,21 @@ def main():
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+    if args.best_adapter and best_step is not None:
+        best_model = load_qwen3_dir(
+            MODEL_DIR,
+            context_size=args.context_size,
+            device=device,
+        )
+        add_lora(best_model, rank=args.rank, alpha=args.alpha)
+        load_lora(best_model, args.best_adapter, strict=True)
+        best_model.to(device).eval()
+
+        print(f"best val loss: {best_val_loss:.6f}")
+        print(f"best step: {best_step}")
+        print("best adapter reload: passed")
+
 
     print(f"trainable parameters: {trainable_count}")
     print(f"initial train loss: {initial_train_loss:.6f}")
