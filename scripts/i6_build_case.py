@@ -5,7 +5,12 @@ import subprocess
 from pathlib import Path
 
 
-def query_metadata(project, bug_id, test_method=None):
+def query_metadata(
+    project,
+    bug_id,
+    test_method=None,
+    trigger_test_override=None,
+):
     result = subprocess.run(
         [
             "defects4j",
@@ -28,17 +33,31 @@ def query_metadata(project, bug_id, test_method=None):
             continue
 
         trigger_test = row[4]
-        if test_method:
+
+        if trigger_test_override:
             candidates = trigger_test.split(";")
-            trigger_test = next(
+            if trigger_test_override not in candidates:
+                raise ValueError(
+                    f"指定触发测试不在元数据中：{trigger_test_override}"
+                )
+            trigger_test = trigger_test_override
+        elif test_method:
+            candidates = trigger_test.split(";")
+            matches = [
                 candidate
                 for candidate in candidates
                 if candidate.rsplit("::", 1)[-1] == test_method
-            )
-        elif ";" in trigger_test:
-            raise ValueError(
-                "该缺陷有多个触发测试，请用 --test-method 指定一个"
-            )
+            ]
+            if not matches:
+                raise ValueError(
+                    f"没有找到名为 {test_method} 的触发测试"
+                )
+            if len(matches) > 1:
+                raise ValueError(
+                    "存在多个同名测试，请改用完整的 --trigger-test"
+                )
+            trigger_test = matches[0]
+
 
         if ";" in row[3]:
             raise ValueError("第一版只支持单个目标修改类")
@@ -106,6 +125,7 @@ def main():
         choices=("train_candidate", "validation_candidate", "eval_holdout"),
         default="eval_holdout",
     )
+    parser.add_argument("--trigger-test", default=None)
     parser.add_argument("--output-dir", required=True)
     args = parser.parse_args()
 
@@ -114,6 +134,7 @@ def main():
         args.project,
         args.bug_id,
         test_method=args.test_method,
+        trigger_test_override=args.trigger_test,
     )
 
     source_file = (
