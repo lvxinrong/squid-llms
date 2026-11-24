@@ -87,7 +87,18 @@ def main():
 
     for bug_id in bug_ids:
         if bug_id not in metadata:
-            raise ValueError(f"未知 bug id: {bug_id}")
+            entries.append({
+                "instance_id": f"{args.project}-{bug_id}",
+                "buggy_commit": None,
+                "fixed_commit": None,
+                "target_classes": [],
+                "trigger_tests": [],
+                "classification": "inactive_or_unknown",
+                "files": [],
+                "workdir": str(workroot / f"{args.project}-{bug_id}".lower()),
+                "tests_verified_by_this_script": False,
+            })
+            continue
 
         bug = metadata[bug_id]
         instance_id = f"{args.project}-{bug_id}"
