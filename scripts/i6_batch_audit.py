@@ -61,6 +61,35 @@ def classify_bug(file_audits):
     return "needs_review"
 
 
+def try_checkout_missing(workdir, project, bug_id):
+    for version, directory in (
+        ("b", "buggy"),
+        ("f", "fixed"),
+    ):
+        target = workdir / directory
+        if target.is_dir():
+            continue
+
+        try:
+            subprocess.run(
+                [
+                    "defects4j",
+                    "checkout",
+                    "-p",
+                    project,
+                    "-v",
+                    f"{bug_id}{version}",
+                    "-w",
+                    str(target),
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as error:
+            return f"checkout {bug_id}{version} failed: {error}"
+
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
@@ -117,32 +146,31 @@ def main():
         if workdir_missing and args.checkout_missing:
             workdir.mkdir(parents=True, exist_ok=True)
 
-            for version, directory in (
-                ("b", "buggy"),
-                ("f", "fixed"),
-            ):
-                target = workdir / directory
-                if target.is_dir():
-                    continue
-
-                subprocess.run(
-                    [
-                        "defects4j",
-                        "checkout",
-                        "-p",
-                        args.project,
-                        "-v",
-                        f"{bug_id}{version}",
-                        "-w",
-                        str(target),
-                    ],
-                    check=True,
-                )
+            checkout_error = try_checkout_missing(
+                workdir,
+                args.project,
+                bug_id,
+            )
+            if checkout_error is not None:
+                entries.append({
+                    "instance_id": instance_id,
+                    "buggy_commit": bug["buggy_commit"],
+                    "fixed_commit": bug["fixed_commit"],
+                    "target_classes": bug["target_classes"],
+                    "trigger_tests": bug["trigger_tests"],
+                    "classification": "checkout_error",
+                    "files": [],
+                    "workdir": str(workdir),
+                    "errors": [checkout_error],
+                    "tests_verified_by_this_script": False,
+                })
+                continue
 
             workdir_missing = not (
                 (workdir / "buggy").is_dir()
                 and (workdir / "fixed").is_dir()
             )
+
 
         if workdir_missing:
             entries.append({
