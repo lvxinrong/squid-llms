@@ -89,6 +89,23 @@ def main():
         instance_id = f"{args.project}-{bug_id}"
         workdir = workroot / instance_id.lower()
 
+        if not (
+                (workdir / "buggy").is_dir()
+                and (workdir / "fixed").is_dir()
+        ):
+            entries.append({
+                "instance_id": instance_id,
+                "buggy_commit": bug["buggy_commit"],
+                "fixed_commit": bug["fixed_commit"],
+                "target_classes": bug["target_classes"],
+                "trigger_tests": bug["trigger_tests"],
+                "classification": "missing_workdir",
+                "files": [],
+                "workdir": str(workdir),
+                "tests_verified_by_this_script": False,
+            })
+            continue
+
         file_audits = []
 
         for target_class in bug["target_classes"]:
