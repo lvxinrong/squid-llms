@@ -17,8 +17,32 @@ RUN_ID = "gl3_fm"
 PROMPT_VERSION = "gl3_given_location_full_method"
 VAL_DATA = ROOT / "data/instruct/i6_structured_16_val.json"
 
+LOCATION_LINES = {
+    "Lang-10": "2-12",
+    "Lang-26": "2",
+    "Lang-28": "29",
+    "Math-2": "2",
+}
 
-def build_full_method_task(case, target_method, old_text):
+
+def build_full_method_task(
+    case,
+    target_method,
+    old_text,
+    location_lines=None,
+):
+    if location_lines is None:
+        location_block = (
+            "[给定待修改原文]\n"
+            f"{old_text}"
+        )
+    else:
+        location_block = (
+            "[给定待修改位置]\n"
+            f"目标方法第 {location_lines} 行；"
+            "以方法签名为第 1 行，空行照计。"
+        )
+
     return f"""你是一名 Java 程序修复助手。本轮已给出目标方法中的待修改原文，请输出修复后的完整目标方法。
 
 输出契约：
@@ -42,8 +66,8 @@ def build_full_method_task(case, target_method, old_text):
 
 {case["test_source"]}
 
-[给定待修改原文]
-{old_text}"""
+{location_block}"""
+
 
 
 def run_full_method_arm(
@@ -117,7 +141,8 @@ def run_full_method_arm(
             "instance_id": prepared["instance_id"],
             "evaluation_mode": "given_location_full_method",
             "run_id": RUN_ID,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": prepared["prompt_version"],
+            "old_text_in_prompt": prepared["old_text_in_prompt"],
             "arm": arm,
             "adapter": adapter_path,
             "adapter_rank": adapter_rank,
@@ -180,6 +205,10 @@ def main():
         default="float32",
     )
     parser.add_argument("--preflight-only", action="store_true")
+    parser.add_argument(
+        "--location-by-line",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -238,10 +267,21 @@ def main():
             "reference_full_tokens": reference_full_tokens,
         }
 
+        prompt_version = (
+            "gl3_full_method_line_location"
+            if args.location_by_line
+            else PROMPT_VERSION
+        )
+
         task = build_full_method_task(
             case,
             prepared["target_method"],
             prepared["old_text"],
+            location_lines=(
+                LOCATION_LINES[instance_id]
+                if args.location_by_line
+                else None
+            ),
         )
         prompt = build_qwen_chat_prompt(
             tokenizer,
@@ -282,6 +322,8 @@ def main():
             "reference_full_with_eos_tokens": (
                 reference_full_tokens + 1
             ),
+            "prompt_version": prompt_version,
+            "old_text_in_prompt": not args.location_by_line,
         })
 
         preflight = {
@@ -291,7 +333,8 @@ def main():
         }
         preflight.update({
             "run_id": RUN_ID,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": prepared["prompt_version"],
+            "old_text_in_prompt": prepared["old_text_in_prompt"],
             "reference_full_method_in_prompt": False,
         })
         preflight_path = output_dir / (
