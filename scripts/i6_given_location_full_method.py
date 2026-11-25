@@ -22,6 +22,7 @@ LOCATION_LINES = {
     "Lang-26": "2",
     "Lang-28": "29",
     "Math-2": "2",
+    "Lang-33": "8",
 }
 
 
@@ -252,6 +253,10 @@ def main():
     ))
 
     val_entries = json.loads(VAL_DATA.read_text(encoding="utf-8"))
+    val_entries += json.loads(
+        (ROOT / "data/instruct/i6_structured_32_train.json")
+        .read_text(encoding="utf-8")
+    )
     val_by_id = {
         entry["instance_id"]: entry
         for entry in val_entries
