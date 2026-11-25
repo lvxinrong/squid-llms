@@ -82,21 +82,59 @@ def map_qwen3_state_dict(state_dict, tie_word_embeddings):
     return mapped
 
 
-def load_qwen3(weights_path, cfg, device=None):
-    state_dict = load_file(str(weights_path), device="cpu")
+def load_qwen3_weights(weights_path):
+    weights_path = Path(weights_path)
+
+    if not weights_path.is_dir():
+        return load_file(str(weights_path), device="cpu")
+
+    index_path = weights_path / "model.safetensors.index.json"
+    if not index_path.exists():
+        return load_file(
+            str(weights_path / "model.safetensors"),
+            device="cpu",
+        )
+
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    shards = sorted(set(index["weight_map"].values()))
+    state_dict = {}
+
+    for shard in shards:
+        state_dict.update(load_file(
+            str(weights_path / shard),
+            device="cpu",
+        ))
+
+    return state_dict
+
+
+
+
+
+def load_qwen3(weights_path, cfg, device=None, dtype=None):
+    state_dict = load_qwen3_weights(weights_path)
     mapped = map_qwen3_state_dict(
         state_dict,
         cfg["tie_word_embeddings"],
     )
 
     model = GPTModelV4(cfg)
+    if dtype is not None:
+        model = model.to(dtype=dtype)
+
     model.load_state_dict(mapped)
     model.to(device or get_device())
     model.eval()
     return model
 
 
-def load_qwen3_dir(model_dir, context_size=4096, device=None):
+
+def load_qwen3_dir(
+    model_dir,
+    context_size=4096,
+    device=None,
+    dtype=None,
+):
     model_dir = Path(model_dir)
     config = json.loads(
         (model_dir / "config.json").read_text(encoding="utf-8")
@@ -131,7 +169,8 @@ def load_qwen3_dir(model_dir, context_size=4096, device=None):
     }
 
     return load_qwen3(
-        model_dir / "model.safetensors",
+        model_dir,
         cfg=cfg,
         device=device,
+        dtype=dtype,
     )
