@@ -46,11 +46,16 @@ def make_edit(prepared, new_text):
     return edit
 
 
-def generate_token_ids(model, input_ids, eos_id):
+def generate_token_ids(
+    model,
+    input_ids,
+    eos_id,
+    max_new_tokens=MAX_NEW_TOKENS,
+):
     output = generate(
         model,
         input_ids,
-        max_new_tokens=MAX_NEW_TOKENS,
+        max_new_tokens=max_new_tokens,
         context_size=CONTEXT_SIZE,
         temperature=0.0,
         eos_id=eos_id,
