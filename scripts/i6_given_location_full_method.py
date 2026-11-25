@@ -52,6 +52,8 @@ def run_full_method_arm(
     prepared_instances,
     tokenizer,
     output_dir,
+    model_dir,
+    dtype,
 ):
     baseline_namespace = runpy.run_path(str(
         ROOT / "scripts/i6_given_location_baseline.py"
@@ -66,6 +68,8 @@ def run_full_method_arm(
         baseline_namespace["load_model"](
             adapter_path,
             device,
+            model_dir=model_dir,
+            dtype=dtype,
         )
     )
     dtype = str(next(model.parameters()).dtype)
@@ -109,6 +113,7 @@ def run_full_method_arm(
                 validation_error = str(error)
 
         report = {
+            "model_dir": str(model_dir),
             "instance_id": prepared["instance_id"],
             "evaluation_mode": "given_location_full_method",
             "run_id": RUN_ID,
@@ -166,9 +171,16 @@ def run_full_method_arm(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--case-dir", required=True)
-    parser.add_argument("--adapter", required=True)
+    parser.add_argument("--adapter", default=None)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--model-dir", default=None)
+    parser.add_argument(
+        "--dtype",
+        choices=("float32", "bfloat16"),
+        default="float32",
+    )
     parser.add_argument("--preflight-only", action="store_true")
+
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -187,9 +199,15 @@ def main():
         for entry in val_entries
     }
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        prepare_namespace["MODEL_DIR"]
+    model_dir = (
+        Path(args.model_dir)
+        if args.model_dir
+        else prepare_namespace["MODEL_DIR"]
     )
+    dtype = getattr(torch, args.dtype)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+
     case_root = Path(args.case_dir)
     prepared_instances = []
 
@@ -304,14 +322,20 @@ def main():
         prepared_instances,
         tokenizer,
         output_dir,
+        model_dir,
+        dtype,
     )
-    run_full_method_arm(
-        "adapter",
-        args.adapter,
-        prepared_instances,
-        tokenizer,
-        output_dir,
-    )
+
+    if args.adapter:
+        run_full_method_arm(
+            "adapter",
+            args.adapter,
+            prepared_instances,
+            tokenizer,
+            output_dir,
+            model_dir,
+            dtype,
+        )
 
 
 if __name__ == "__main__":

@@ -84,11 +84,17 @@ def evaluate_candidate(
     return edit, evaluation
 
 
-def load_model(adapter_path, device):
+def load_model(
+    adapter_path,
+    device,
+    model_dir=MODEL_DIR,
+    dtype=None,
+):
     model = load_qwen3_dir(
-        MODEL_DIR,
+        model_dir,
         context_size=CONTEXT_SIZE,
         device=device,
+        dtype=dtype,
     )
     model.eval()
 
