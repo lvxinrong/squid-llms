@@ -30,6 +30,7 @@ def build_full_method_task(
     target_method,
     old_text,
     location_lines=None,
+    behavior_evidence=None,
 ):
     if location_lines is None:
         location_block = (
@@ -43,6 +44,13 @@ def build_full_method_task(
             "以方法签名为第 1 行，空行照计。"
         )
 
+    if behavior_evidence is None:
+        evidence_block = ""
+    else:
+        evidence_block = (
+            "[实测行为证据]\n"
+            f"{behavior_evidence}\n\n"
+        )
     return f"""你是一名 Java 程序修复助手。本轮已给出目标方法中的待修改原文，请输出修复后的完整目标方法。
 
 输出契约：
@@ -66,7 +74,7 @@ def build_full_method_task(
 
 {case["test_source"]}
 
-{location_block}"""
+{evidence_block}{location_block}"""
 
 
 
@@ -170,6 +178,9 @@ def run_full_method_arm(
             "validation_error": validation_error,
             "reference_new_text_in_prompt": False,
             "reference_full_method_in_prompt": False,
+            "behavior_evidence_in_prompt": prepared[
+                "behavior_evidence_in_prompt"
+            ],
         }
 
         case_id = prepared["instance_id"].lower()
@@ -209,8 +220,26 @@ def main():
         "--location-by-line",
         action="store_true",
     )
+    parser.add_argument(
+        "--instances",
+        default=None,
+        help="逗号分隔；默认使用当前四题",
+    )
+    parser.add_argument(
+        "--evidence-file",
+        default=None,
+        help="JSON 对象，键为 instance_id，值为实测证据文本",
+    )
 
     args = parser.parse_args()
+
+    evidence_by_id = (
+        json.loads(
+            Path(args.evidence_file).read_text(encoding="utf-8")
+        )
+        if args.evidence_file
+        else {}
+    )
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -240,7 +269,13 @@ def main():
     case_root = Path(args.case_dir)
     prepared_instances = []
 
-    for instance_id in baseline_namespace["INSTANCE_IDS"]:
+    instance_ids = (
+        args.instances.split(",")
+        if args.instances
+        else baseline_namespace["INSTANCE_IDS"]
+    )
+
+    for instance_id in instance_ids:
         case_id = instance_id.lower()
         case_path = case_root / f"{case_id}-case.json"
         key_path = case_root / f"{case_id}-key.json"
@@ -272,6 +307,8 @@ def main():
             if args.location_by_line
             else PROMPT_VERSION
         )
+        if evidence_by_id.get(instance_id):
+            prompt_version += "_behavior_evidence"
 
         task = build_full_method_task(
             case,
@@ -282,6 +319,7 @@ def main():
                 if args.location_by_line
                 else None
             ),
+            behavior_evidence=evidence_by_id.get(instance_id),
         )
         prompt = build_qwen_chat_prompt(
             tokenizer,
@@ -324,6 +362,9 @@ def main():
             ),
             "prompt_version": prompt_version,
             "old_text_in_prompt": not args.location_by_line,
+            "behavior_evidence_in_prompt": bool(
+                evidence_by_id.get(instance_id)
+            ),
         })
 
         preflight = {
@@ -336,6 +377,9 @@ def main():
             "prompt_version": prepared["prompt_version"],
             "old_text_in_prompt": prepared["old_text_in_prompt"],
             "reference_full_method_in_prompt": False,
+            "behavior_evidence_in_prompt": prepared[
+                "behavior_evidence_in_prompt"
+            ],
         })
         preflight_path = output_dir / (
             f"i6-{case_id}-gl3-fm-preflight.json"

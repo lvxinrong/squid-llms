@@ -49,3 +49,20 @@ def test_line_location_prompt_does_not_repeat_old_text():
     assert "    int value = 1;\n}" in task
     assert "[给定待修改原文]" not in task
     assert task.count("    int value = 1;") == 1
+
+def test_behavior_evidence_precedes_line_location():
+    task = namespace["build_full_method_task"](
+        case(),
+        "demo",
+        "    int value = 1;",
+        location_lines="2",
+        behavior_evidence="buggy probe actual = -49.75",
+    )
+
+    assert "[实测行为证据]" in task
+    assert "buggy probe actual = -49.75" in task
+    assert (
+        task.index("[实测行为证据]")
+        < task.index("[给定待修改位置]")
+    )
+
