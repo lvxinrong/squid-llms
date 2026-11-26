@@ -105,7 +105,10 @@ def main():
             args.adapter,
             strict=True,
         )
-        model.to(device)
+        model.to(
+            device=device,
+            dtype=next(model.parameters()).dtype,
+        )
 
     model.eval()
     dtype = str(next(model.parameters()).dtype)
