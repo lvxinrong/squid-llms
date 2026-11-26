@@ -11,6 +11,9 @@ from squid.checkpoints.qwen3 import load_qwen3_dir
 from squid.device import get_device
 from squid.generate.chat import build_qwen_chat_prompt
 from squid.generate.engine import generate
+import runpy
+from squid.checkpoints.lora import load_lora
+
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +66,8 @@ def main():
     parser.add_argument("--tasks", required=True)
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--adapter", default=None)
+
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -77,6 +82,30 @@ def main():
         device=device,
         dtype=torch.bfloat16,
     )
+
+    adapter_rank = None
+    adapter_alpha = None
+
+    if args.adapter:
+        baseline_namespace = runpy.run_path(str(
+            ROOT / "scripts/i6_structured_edit_baseline.py"
+        ))
+        adapter_rank, adapter_alpha = (
+            baseline_namespace["read_adapter_config"](
+                args.adapter
+            )
+        )
+        baseline_namespace["add_lora"](
+            model,
+            rank=adapter_rank,
+            alpha=adapter_alpha,
+        )
+        load_lora(
+            model,
+            args.adapter,
+            strict=True,
+        )
+
     model.eval()
     dtype = str(next(model.parameters()).dtype)
 
@@ -147,6 +176,9 @@ def main():
                 "manual_score": None,
                 "manual_notes": None,
             },
+            "adapter": args.adapter,
+            "adapter_rank": adapter_rank,
+            "adapter_alpha": adapter_alpha,
         }
 
         report_path = output_dir / f"{task['id'].lower()}.json"
