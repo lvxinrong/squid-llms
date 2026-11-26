@@ -159,7 +159,6 @@ def main():
             "instance_id": task["id"],
             "kind": task["kind"],
             "model_dir": args.model_dir,
-            "adapter": None,
             "prompt": prompt,
             "prompt_tokens": prompt_tokens,
             "input_ids_sha256": ids_hash,
