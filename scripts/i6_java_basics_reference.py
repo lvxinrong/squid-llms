@@ -82,10 +82,10 @@ def run_command(command, cwd):
     }
 
 
-def evaluate_reference(task):
+def evaluate_method(task, method, mode):
     result = {
         "instance_id": task["id"],
-        "mode": "reference",
+        "mode": mode,
         "structure_pass": False,
         "compile_pass": False,
         "behavior_pass": False,
@@ -97,7 +97,7 @@ def evaluate_reference(task):
 
     try:
         namespace["validate_method_response"](
-            task["reference_method"],
+            method,
             task["signature"] + " {",
         )
     except ValueError as error:
@@ -172,6 +172,12 @@ def evaluate_reference(task):
 
     return result
 
+def evaluate_reference(task):
+    return evaluate_method(
+        task,
+        task["reference_method"],
+        "reference",
+    )
 
 def main():
     parser = argparse.ArgumentParser()
