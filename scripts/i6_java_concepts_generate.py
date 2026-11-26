@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 from squid.checkpoints.qwen3 import load_qwen3_dir
 from squid.device import get_device
 from squid.generate.chat import build_qwen_chat_prompt
-from squid.generate.engine import generate
+from squid.generate.engine import generate, generate_no_cache
 import runpy
 from squid.checkpoints.lora import load_lora
 
@@ -73,6 +73,7 @@ def main():
         choices=("bfloat16", "float32"),
         default="bfloat16",
     )
+    parser.add_argument("--no-cache", action="store_true")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -163,24 +164,40 @@ def main():
         ids_hash = input_hash(input_ids)
         input_ids = input_ids.to(device)
 
-        generated = generate(
-            model,
-            input_ids,
-            max_new_tokens=MAX_NEW_TOKENS,
-            context_size=CONTEXT_SIZE,
-            temperature=0.0,
-            eos_id=tokenizer.eos_token_id,
-        )
+        if args.no_cache:
+            generated = generate_no_cache(
+                model,
+                input_ids,
+                max_new_tokens=MAX_NEW_TOKENS,
+                context_size=CONTEXT_SIZE,
+                temperature=0.0,
+                eos_id=tokenizer.eos_token_id,
+            )
+        else:
+            generated = generate(
+                model,
+                input_ids,
+                max_new_tokens=MAX_NEW_TOKENS,
+                context_size=CONTEXT_SIZE,
+                temperature=0.0,
+                eos_id=tokenizer.eos_token_id,
+            )
+
         generated_ids = generated[0, input_ids.shape[1]:].tolist()
-        stopped = bool(
-            generated_ids
-            and generated_ids[-1] == tokenizer.eos_token_id
-        )
-        content_ids = (
-            generated_ids[:-1]
-            if stopped
-            else generated_ids
-        )
+        if args.no_cache:
+            stopped = len(generated_ids) < MAX_NEW_TOKENS
+            content_ids = generated_ids
+        else:
+            stopped = bool(
+                generated_ids
+                and generated_ids[-1] == tokenizer.eos_token_id
+            )
+            content_ids = (
+                generated_ids[:-1]
+                if stopped
+                else generated_ids
+            )
+
         response = tokenizer.decode(
             content_ids,
             skip_special_tokens=False,
@@ -211,6 +228,7 @@ def main():
             "adapter_rank": adapter_rank,
             "adapter_alpha": adapter_alpha,
             "prompt_mode": "sft" if args.sft_prompt else "legacy",
+            "generation_mode": "no_cache" if args.no_cache else "kv_cache",
 
         }
 
