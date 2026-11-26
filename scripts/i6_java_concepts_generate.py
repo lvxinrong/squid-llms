@@ -68,7 +68,11 @@ def main():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--adapter", default=None)
     parser.add_argument("--sft-prompt", action="store_true")
-
+    parser.add_argument(
+        "--dtype",
+        choices=("bfloat16", "float32"),
+        default="bfloat16",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -77,11 +81,12 @@ def main():
     tasks = load_tasks(args.tasks)
     device = get_device()
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
+    model_dtype = getattr(torch, args.dtype)
     model = load_qwen3_dir(
         args.model_dir,
         context_size=CONTEXT_SIZE,
         device=device,
-        dtype=torch.bfloat16,
+        dtype=model_dtype,
     )
 
     adapter_rank = None
@@ -108,7 +113,7 @@ def main():
         )
         model.to(
             device=device,
-            dtype=next(model.parameters()).dtype,
+            dtype=model_dtype,
         )
 
     model.eval()
