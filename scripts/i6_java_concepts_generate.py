@@ -229,7 +229,6 @@ def main():
             "adapter_alpha": adapter_alpha,
             "prompt_mode": "sft" if args.sft_prompt else "legacy",
             "generation_mode": "no_cache" if args.no_cache else "kv_cache",
-
         }
 
         report_path = output_dir / f"{task['id'].lower()}.json"
