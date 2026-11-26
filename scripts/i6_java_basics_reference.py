@@ -122,7 +122,7 @@ def evaluate_method(task, method, mode):
         workdir = Path(temporary)
         (workdir / "JavaBasics.java").write_text(
             "public final class JavaBasics {\n"
-            + task["reference_method"]
+            + method
             + "\n}\n",
             encoding="utf-8",
         )

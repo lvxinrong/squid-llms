@@ -18,8 +18,44 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_SIZE = 4096
 MAX_NEW_TOKENS = 256
 
+MINIMAL_TASK_PROMPTS = {
+    "J0-01": (
+        "请使用 Java 实现一个名为 add 的静态方法，"
+        "参数为 int a 和 int b，返回它们的和。"
+    ),
+    "J0-02": (
+        "请使用 Java 实现一个名为 maxOfTwo 的静态方法，"
+        "参数为 int a 和 int b，返回较大的那个数；"
+        "如果相等，返回任意一个。"
+    ),
+    "J0-03": (
+        "请使用 Java 实现一个名为 sumArray 的静态方法，"
+        "参数为 int[] values，返回数组所有元素的和；"
+        "空数组返回 0，数组不为 null。"
+    ),
+    "J0-04": (
+        "请使用 Java 实现一个名为 countEven 的静态方法，"
+        "参数为 int[] values，返回数组中偶数元素的个数。"
+    ),
+    "J0-05": (
+        "请使用 Java 实现一个名为 toUpperCase 的静态方法，"
+        "参数为 String text，返回其大写形式；"
+        "输入为 null 时返回 null。"
+    ),
+    "J0-06": (
+        "请使用 Java 实现一个名为 divideAsDouble 的静态方法，"
+        "参数为 int dividend 和 int divisor，"
+        "返回两数相除的 double 结果，除数不为 0。"
+    ),
+}
 
-def task_prompt(tokenizer, task):
+
+def task_prompt(
+    tokenizer,
+    task,
+    prompt_version="v1",
+    generation_mode="instruction",
+):
     task_text = f"""你是一名严谨的 Java 代码生成助手。请根据方法签名和规格实现一个短方法。
 
 只输出一个完整 Java 方法，方法签名必须与输入一致。
@@ -33,12 +69,40 @@ def task_prompt(tokenizer, task):
 
 [公开示例]
 {task["public_example"]}"""
-    return build_qwen_chat_prompt(
+
+    if prompt_version == "v2":
+        task_text += """
+
+[完整性要求]
+方法体必须非空，并以 } 结束。
+不要在方法体完成之前结束生成。"""
+
+    prompt = build_qwen_chat_prompt(
         tokenizer,
         [],
         task_text,
         enable_thinking=False,
     )
+
+    if generation_mode == "raw":
+        return (
+            "// Task\n"
+            f"// {task['specification']}\n"
+            "// Public example\n"
+            f"// {task['public_example']}\n"
+            f"{task['signature']} {{"
+        )
+
+    if generation_mode == "minimal":
+        return (
+            MINIMAL_TASK_PROMPTS[task["id"]]
+        )
+
+    if generation_mode == "prefill":
+        prompt += task["signature"] + " {"
+
+    return prompt
+
 
 
 def input_hash(input_ids):
@@ -57,6 +121,22 @@ def main():
     parser.add_argument("--tasks", required=True)
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument(
+        "--dtype",
+        choices=("bfloat16", "float32"),
+        default="bfloat16",
+    )
+    parser.add_argument(
+        "--prompt-version",
+        choices=("v1", "v2"),
+        default="v1",
+    )
+    parser.add_argument(
+        "--generation-mode",
+        choices=("instruction", "prefill", "raw", "minimal"),
+        default="instruction",
+    )
+
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -69,12 +149,13 @@ def main():
     evaluate_method = reference_namespace["evaluate_method"]
 
     device = get_device()
+    dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
     model = load_qwen3_dir(
         args.model_dir,
         context_size=CONTEXT_SIZE,
         device=device,
-        dtype=torch.bfloat16,
+        dtype=dtype,
     )
     model.eval()
     dtype = str(next(model.parameters()).dtype)
@@ -82,7 +163,12 @@ def main():
     results = []
 
     for task in tasks:
-        prompt = task_prompt(tokenizer, task)
+        prompt = task_prompt(
+            tokenizer,
+            task,
+            prompt_version=args.prompt_version,
+            generation_mode=args.generation_mode,
+        )
         input_ids = tokenizer.encode(
             prompt,
             return_tensors="pt",
@@ -116,6 +202,14 @@ def main():
             clean_up_tokenization_spaces=False,
         )
 
+        completion_response = response
+        if args.generation_mode in {"prefill", "raw"}:
+            response = (
+                task["signature"]
+                + " {"
+                + completion_response
+            )
+
         result = evaluate_method(
             task,
             response,
@@ -132,6 +226,25 @@ def main():
             "finish_reason": "stop" if stopped else "length",
             "response": response,
             "dtype": dtype,
+            "generation_mode": args.generation_mode,
+            "completion_response": (
+                completion_response
+                if args.generation_mode in {"prefill", "raw"}
+                else None
+            ),
+            "prompt_format": (
+                "minimal_natural_language"
+                if args.generation_mode == "minimal"
+                else "plain_text"
+                if args.generation_mode == "raw"
+                else "qwen_chat"
+            ),
+            "completion_prefix": (
+                task["signature"] + " {"
+                if args.generation_mode in {"prefill", "raw"}
+                else None
+            ),
+            "evaluator_version": "java-basics-v2-candidate-method",
         })
 
         if not stopped:
