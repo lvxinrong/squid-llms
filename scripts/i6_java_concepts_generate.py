@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--adapter", default=None)
+    parser.add_argument("--sft-prompt", action="store_true")
 
     args = parser.parse_args()
 
@@ -114,18 +115,40 @@ def main():
     dtype = str(next(model.parameters()).dtype)
 
     for task in tasks:
-        task_text = (
-            "你是一名 Java 教师。请直接回答下面的问题，"
-            "先给结论，再用简洁的话解释原因。"
-            "不要重复题目，不要输出与问题无关的内容。\n\n"
-            f"[问题]\n{task['question']}"
-        )
-        prompt = build_qwen_chat_prompt(
-            tokenizer,
-            [],
-            task_text,
-            enable_thinking=False,
-        )
+        if args.sft_prompt:
+            prompt = tokenizer.apply_chat_template(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "你是一名严谨的 Java 教师。请直接回答问题，"
+                            "先给结论，再用简洁的话解释原因。"
+                            "不要重复题目，不要输出与问题无关的内容。"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": task["question"],
+                    },
+                ],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        else:
+            task_text = (
+                "你是一名 Java 教师。请直接回答下面的问题，"
+                "先给结论，再用简洁的话解释原因。"
+                "不要重复题目，不要输出与问题无关的内容。\n\n"
+                f"[问题]\n{task['question']}"
+            )
+            prompt = build_qwen_chat_prompt(
+                tokenizer,
+                [],
+                task_text,
+                enable_thinking=False,
+            )
+
         input_ids = tokenizer.encode(
             prompt,
             return_tensors="pt",
@@ -182,6 +205,8 @@ def main():
             "adapter": args.adapter,
             "adapter_rank": adapter_rank,
             "adapter_alpha": adapter_alpha,
+            "prompt_mode": "sft" if args.sft_prompt else "legacy",
+
         }
 
         report_path = output_dir / f"{task['id'].lower()}.json"
